@@ -8,7 +8,8 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest  # Bắt buộc phải là macos-latest để có sẵn Apple SDK (UIKit, Foundation)
+    # QUAN TRỌNG: Phải dùng macos-latest để có sẵn Apple SDK (UIKit, Foundation)
+    runs-on: macos-latest
 
     steps:
     - name: Checkout Repository
