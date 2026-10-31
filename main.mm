@@ -103,7 +103,7 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 }
 
 // ==========================================
-// --- 3. GIAO DIỆN WEBVIEW MOD MENU (PRELOAD NGẦM) ---
+// --- 3. GIAO DIỆN CYBER WEBVIEW MOD MENU ---
 // ==========================================
 @interface WebModMenuController : NSObject <WKScriptMessageHandler, WKNavigationDelegate>
 @property (nonatomic, strong) UIWindow *menuWindow;
@@ -125,12 +125,12 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
     return shared;
 }
 
-// Khởi tạo và load sẵn WebView ngầm từ đầu để chống đứng game tuyệt đối
+// Preload ngầm từ đầu để chống đứng game tuyệt đối khi mở
 - (void)preloadMenu {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.menuWindow) return;
 
-        self.menuWindow = [[UIWindow alloc] initWithFrame:CGRectMake(20, 60, 345, 450)];
+        self.menuWindow = [[UIWindow alloc] initWithFrame:CGRectMake(15, 40, 360, 480)];
         self.menuWindow.windowLevel = UIWindowLevelStatusBar + 200;
         self.menuWindow.backgroundColor = [UIColor clearColor];
 
@@ -147,47 +147,61 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
         webView.opaque = NO;
 
         NSString *htmlContent = @
-        "<!DOCTYPE html>"
-        "<html lang=\"vi\">"
-        "<head>"
-        "<meta charset=\"UTF-8\">"
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">"
-        "<title>Sheepct Mod Menu</title>"
-        "<style>"
-        "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, sans-serif; color: #ffffff; user-select: none; -webkit-user-select: none; }"
-        ".menu-container { position: absolute; top: 0; left: 0; width: 345px; height: 450px; background: rgba(15, 15, 25, 0.96); border: 1.5px solid rgba(0, 200, 255, 0.8); border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7); overflow: hidden; }"
-        ".header { padding: 12px; background: linear-gradient(90deg, rgba(0,100,200,0.5), rgba(0,200,255,0.2)); text-align: center; font-weight: bold; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.1); }"
-        ".author { font-size: 10px; color: #00e5ff; margin-top: 2px; }"
-        ".content { padding: 12px; height: 330px; overflow-y: auto; }"
-        ".btn-toggle { width: 100%; padding: 10px; margin-bottom: 8px; background: rgba(30, 30, 45, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-weight: bold; font-size: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }"
-        ".btn-toggle.active { background: rgba(20, 80, 40, 0.9); border-color: rgba(50, 255, 100, 0.6); color: #5eff7d; }"
-        ".slider-group { margin-bottom: 12px; background: rgba(25, 25, 40, 0.6); padding: 8px; border-radius: 8px; }"
-        ".slider-label { font-size: 11px; margin-bottom: 4px; display: flex; justify-content: space-between; color: #ffcc00; }"
-        "input[type=range] { width: 100%; accent-color: #00e5ff; }"
-        ".footer { position: absolute; bottom: 0; width: 100%; padding: 8px 0; text-align: center; background: rgba(10, 10, 15, 0.9); border-top: 1px solid rgba(255,255,255,0.1); }"
-        ".btn-close { background: rgba(200, 50, 50, 0.8); color: white; border: none; padding: 6px 16px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; }"
-        "</style>"
-        "</head>"
-        "<body>"
-        "<div class=\"menu-container\">"
-        "<div class=\"header\">👑 Sheepct Mod Menu<div class=\"author\">Tool do TRẦN MẠNH CƯỜNG phát triển</div></div>"
-        "<div class=\"content\">"
-        "<button class=\"btn-toggle\" id=\"godmode\" onclick=\"toggleMod('godmode')\"><span>1. Kháng sát thương (God Mode)</span><span id=\"txt-godmode\">[ TẮT ]</span></button>"
-        "<button class=\"btn-toggle\" id=\"speed\" onclick=\"toggleMod('speed')\"><span>2. Tốc độ di chuyển</span><span id=\"txt-speed\">[ TẮT ]</span></button>"
-        "<div class=\"slider-group\"><div class=\"slider-label\"><span>Hệ số Tốc độ</span><span id=\"val-speed\">1.0x</span></div><input type=\"range\" min=\"1\" max=\"10\" step=\"0.5\" value=\"1\" oninput=\"updateSlider('speed', this.value)\"></div>"
-        "<button class=\"btn-toggle\" id=\"jump\" onclick=\"toggleMod('jump')\"><span>3. Khinh công / Nhảy cao</span><span id=\"txt-jump\">[ TẮT ]</span></button>"
-        "<button class=\"btn-toggle\" id=\"gamespeed\" onclick=\"toggleMod('gamespeed')\"><span>4. Tăng tốc độ Game</span><span id=\"txt-gamespeed\">[ TẮT ]</span></button>"
-        "</div>"
-        "<div class=\"footer\"><button class=\"btn-close\" onclick=\"closeMenu()\">Ẩn Menu</button></div>"
+        "<!doctype html>"
+        "<html lang=\"vi\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no\"><title>Cyber Menu UI</title><style>"
+        ":root{--bg:#101014;--card:#18181e;--line:#303039;--red:#ff304f;--cyan:#57e5ff;--muted:#9696a1}*{box-sizing:border-box}body{margin:0;background:transparent;font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;color:#f4f4f7;padding:0}"
+        ".panel{width:360px;height:480px;background:#101014f5;border:1px solid #34343e;border-radius:22px;box-shadow:0 25px 90px #000b;overflow:hidden;display:flex;flex-direction:column}"
+        ".top{height:60px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid #26262e}"
+        ".logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#173654,#10121b);display:grid;place-items:center;color:var(--cyan);font-size:16px;font-weight:900;box-shadow:0 0 12px #00d9ff35}"
+        ".brand{font-size:16px;font-weight:800;letter-spacing:.4px}"
+        ".sub{font-size:10px;color:var(--muted);margin-top:2px}"
+        ".spacer{flex:1}"
+        ".topbtn{border:0;border-radius:10px;background:#202027;color:#eee;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer}"
+        ".topbtn.hot{color:var(--red)}"
+        ".main{flex:1;min-height:0;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}"
+        ".card{background:var(--card);border:1px solid #22222a;border-radius:18px;padding:12px}"
+        ".card h2{font-size:13px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.5px}"
+        ".accent{color:var(--red);margin-right:6px}"
+        ".row{min-height:48px;display:flex;align-items:center;gap:10px;padding:6px 2px;border-bottom:1px solid #292930}"
+        ".ico{width:20px;text-align:center;color:var(--red);font-size:16px;font-weight:800}"
+        ".text{min-width:0;flex:1}"
+        ".label{font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
+        ".hint{font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
+        ".switch{width:42px;height:24px;border-radius:20px;border:0;background:#414149;padding:2px;cursor:pointer;flex:none}"
+        ".switch:after{content:\"\";display:block;width:20px;height:20px;border-radius:50%;background:#aaa;transition:.18s}"
+        ".switch.on{background:var(--red)}.switch.on:after{transform:translateX(18px);background:white}"
+        ".action{width:100%;margin-top:8px;padding:10px;border:1px solid #41414b;border-radius:12px;background:#121216;color:#f3f3f5;font-size:13px;font-weight:700;text-align:left;cursor:pointer}"
+        ".sliderbox{padding:10px 2px 2px}"
+        ".sliderhead{display:flex;justify-content:space-between;font-size:12px;font-weight:650}"
+        ".sliderhead span:last-child{color:#fff}"
+        ".range{width:100%;margin:10px 0 0;accent-color:var(--red)}"
+        ".nav{height:50px;flex:none;display:flex;justify-content:space-around;align-items:center;border-top:1px solid #292930;background:#121216}"
+        ".nav button{border:0;background:none;color:#a3a3ad;font-weight:700;font-size:11px;padding:8px 10px;cursor:pointer}"
+        ".nav button.sel{color:white;background:#25252d;border-radius:10px}"
+        ".foot{text-align:center;color:#66d9ec;font-size:10px;font-weight:700;padding:6px;letter-spacing:.3px}"
+        "</style></head><body>"
+        "<div class=\"panel\">"
+        "<header class=\"top\"><div class=\"logo\">C✦</div><div><div class=\"brand\">CYBER CONTROL</div><div class=\"sub\">Tool do TRẦN MẠNH CƯỜNG</div></div><div class=\"spacer\"></div><button class=\"topbtn hot\" onclick=\"closeMenu()\">✕ ĐÓNG</button></header>"
+        "<main class=\"main\">"
+        "<section class=\"card\"><h2><span class=\"accent\">◉</span>TÙY CHỈNH MOD</h2>"
+        "<div class=\"row\"><span class=\"ico\">✧</span><div class=\"text\"><div class=\"label\">1. Kháng sát thương (God Mode)</div><div class=\"hint\">Bật tắt bất tử</div></div><button class=\"switch\" id=\"sw-godmode\" onclick=\"toggleMod('godmode')\"></button></div>"
+        "<div class=\"row\"><span class=\"ico\">▦</span><div class=\"text\"><div class=\"label\">2. Tốc độ di chuyển</div><div class=\"hint\">Tăng tốc chạy</div></div><button class=\"switch\" id=\"sw-speed\" onclick=\"toggleMod('speed')\"></button></div>"
+        "<div class=\"sliderbox\"><div class=\"sliderhead\"><span>Hệ số Tốc độ</span><span id=\"val-speed\">1.0x</span></div><input class=\"range\" type=\"range\" min=\"1\" max=\"10\" step=\"0.5\" value=\"1\" oninput=\"updateSlider('speed', this.value)\"></div>"
+        "</section>"
+        "<section class=\"card\"><h2><span class=\"accent\">⌁</span>HỆ THỐNG & GAME</h2>"
+        "<div class=\"row\"><span class=\"ico\">◉</span><div class=\"text\"><div class=\"label\">3. Khinh công / Nhảy cao</div><div class=\"hint\">Tăng độ cao khi nhảy</div></div><button class=\"switch\" id=\"sw-jump\" onclick=\"toggleMod('jump')\"></button></div>"
+        "<div class=\"sliderbox\"><div class=\"sliderhead\"><span>Tốc độ Game</span><span id=\"val-gamespeed\">1.0x</span></div><input class=\"range\" type=\"range\" min=\"1\" max=\"10\" step=\"0.5\" value=\"1\" oninput=\"updateSlider('gamespeed', this.value)\"></div>"
+        "</section>"
+        "</main>"
+        "<nav class=\"nav\"><button class=\"sel\">TỔNG QUAN</button><button>CÀI ĐẶT</button></nav>"
+        "<div class=\"foot\">CYBER UI • TRẦN MẠNH CƯỜNG PHÁT TRIỂN</div>"
         "</div>"
         "<script>"
-        "let states = { godmode: false, speed: false, jump: false, gamespeed: false };"
+        "let states = { godmode: false, speed: false, jump: false };"
         "function toggleMod(key) {"
         "  states[key] = !states[key];"
-        "  let btn = document.getElementById(key);"
-        "  let txt = document.getElementById('txt-' + key);"
-        "  if (states[key]) { btn.classList.add('active'); txt.innerText = '[ BẬT ]'; } "
-        "  else { btn.classList.remove('active'); txt.innerText = '[ TẮT ]'; }"
+        "  let btn = document.getElementById('sw-' + key);"
+        "  if (states[key]) { btn.classList.add('on'); } else { btn.classList.remove('on'); }"
         "  window.webkit.messageHandlers.modCallback.postMessage({action: key, state: states[key]});"
         "}"
         "function updateSlider(key, val) {"
@@ -196,18 +210,16 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
         "}"
         "function closeMenu() { window.webkit.messageHandlers.modCallback.postMessage({action: 'close'}); }"
         "</script>"
-        "</body>"
-        "</html>";
+        "</body></html>";
 
         [webView loadHTMLString:htmlContent baseURL:nil];
         [vc.view addSubview:webView];
         
-        // Ẩn sẵn cửa sổ ngay sau khi load ngầm xong
         self.menuWindow.hidden = YES;
     });
 }
 
-// Bấm vào icon nổi chỉ bật/tắt hiển thị cửa sổ (Siêu nhanh, không lag)
+// Bấm vào icon nổi mở/đóng menu tức thì (siêu mượt)
 - (void)toggleMenu {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.menuWindow) {
@@ -230,7 +242,8 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
         } else if ([action isEqualToString:@"jump"]) {
             g_enableHighJump = [dict[@"state"] boolValue];
         } else if ([action isEqualToString:@"gamespeed"]) {
-            g_enableGameSpeed = [dict[@"state"] boolValue];
+            g_enableGameSpeed = YES;
+            g_gameSpeedScale = [dict[@"value"] floatValue];
         } else if ([action isEqualToString:@"speed_slider"]) {
             g_speedMultiplier = [dict[@"value"] floatValue];
         }
@@ -274,12 +287,12 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 
 // --- 5. KHỞI TẠO & KÍCH HOẠT DOBBY HOOK ---
 __attribute__((constructor)) static void init_sheepct_mod() {
-    // 1. Preload menu ngầm ngay khi dylib vừa khởi động
+    // 1. Preload menu ngầm ngay khi dylib khởi động
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [[WebModMenuController sharedInstance] preloadMenu];
     });
 
-    // 2. Thực hiện Hook và tạo nút nổi khi game đã ổn định
+    // 2. Thực hiện Hook và tạo nút nổi khi game ổn định
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t slide = get_unity_slide();
         if (slide > 0) {
@@ -324,11 +337,12 @@ __attribute__((constructor)) static void init_sheepct_mod() {
         DraggableButton *floatingBtn = [DraggableButton buttonWithType:UIButtonTypeCustom];
         floatingBtn.frame = CGRectMake(20, 120, 48, 48);
         floatingBtn.backgroundColor = [UIColor colorWithRed:0.08f green:0.08f blue:0.12f alpha:0.95f];
-        [floatingBtn setTitle:@"👑" forState:UIControlStateNormal];
-        floatingBtn.titleLabel.font = [UIFont systemFontOfSize:22];
+        [floatingBtn setTitle:@"C" forState:UIControlStateNormal];
+        floatingBtn.titleLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightBlack];
+        [floatingBtn setTitleColor:[UIColor colorWithRed:0.34f green:0.9f blue:1.0f alpha:1.0f] forState:UIControlStateNormal];
         floatingBtn.layer.cornerRadius = 24.0f;
         floatingBtn.layer.borderWidth = 1.8f;
-        floatingBtn.layer.borderColor = [UIColor colorWithRed:0.0f green:0.8f blue:1.0f alpha:1.0f].CGColor;
+        floatingBtn.layer.borderColor = [UIColor colorWithRed:0.34f green:0.9f blue:1.0f alpha:1.0f].CGColor;
 
         [floatingBtn addTarget:[WebModMenuController sharedInstance] action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
         [targetWindow addSubview:floatingBtn];
