@@ -24,3 +24,16 @@ jobs:
       with:
         name: SheepctMod-Dylib
         path: libSheepctMod.dylib
+        jobs:
+  build:
+    runs-on: macos-latest  # <-- Phải là macos-latest thì mới có UIKit của Apple để build dylib iOS!
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Compile Dynamic Library with Makefile
+      run: |
+        make clean
+        make
+
