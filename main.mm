@@ -3,6 +3,16 @@
 #include <dlfcn.h>
 #include <stdint.h>
 
+#if __has_include(<dobby.h>)
+#include <dobby.h>
+#elif __has_include(<dobby/dobby.h>)
+#include <dobby/dobby.h>
+#else
+extern "C" {
+    int DobbyHook(void *function_address, void *replace_call, void **origin_call);
+}
+#endif
+
 // --- BIẾN TRẠNG THÁI & HỆ SỐ ĐIỀU KHIỂN (MULTI FACTORS) ---
 bool g_BypassAntiCheat = true;
 bool g_GodMode = false;
@@ -39,11 +49,11 @@ static float (*orig_BulletMove_Update)(void *instance) = NULL;
 static bool (*orig_GMCmd_IsGm)(void *instance) = NULL;
 static bool (*orig_FarmCtrl_InitCtrl)(void *instance) = NULL;
 
-// --- CÁC HÀM HOOK THỰC TẾ (ÁP DỤNG TRỰC TIẾP LOGIC MOD) ---
+// --- CÁC HÀM HOOK THỰC TẾ ---
 
 void *hooked_BattleRole_Update(void *instance, float dt) {
     if (g_GodMode) {
-        // [Logic Bất Tử]: Triệt tiêu sát thương nhận vào
+        // Xử lý triệt tiêu sát thương / Bất tử
     }
     return orig_BattleRole_Update(instance, dt);
 }
@@ -51,14 +61,14 @@ void *hooked_BattleRole_Update(void *instance, float dt) {
 float hooked_AttackerSkill_HitAttacker(void *instance) {
     float baseDamage = orig_AttackerSkill_HitAttacker(instance);
     if (g_OneHit) {
-        return baseDamage * g_DamageFactor; // Nhân sát thương theo thanh trượt Multi Factor
+        return baseDamage * g_DamageFactor;
     }
     return baseDamage;
 }
 
 void *hooked_TimeCtrl_Init(void *instance) {
     if (g_GameSpeed) {
-        // [Logic Tốc Độ Game]: Can thiệp thời gian toàn cục
+        // Xử lý tua nhanh thời gian game
     }
     return orig_TimeCtrl_Init(instance);
 }
@@ -66,21 +76,21 @@ void *hooked_TimeCtrl_Init(void *instance) {
 float hooked_BulletMove_Update(void *instance) {
     float speed = orig_BulletMove_Update(instance);
     if (g_MoveSpeed) {
-        return speed * g_MoveScale; // Tăng tốc đạn / di chuyển theo hệ số
+        return speed * g_MoveScale;
     }
     return speed;
 }
 
 bool hooked_GMCmd_IsGm(void *instance) {
     if (g_BypassGMPanel) {
-        return true; // Mở khóa toàn bộ bảng lệnh GM Dev ẩn
+        return true;
     }
     return orig_GMCmd_IsGm(instance);
 }
 
 bool hooked_FarmCtrl_initCtrl(void *instance) {
     if (g_AutoFarm) {
-        return true; // Tự động hóa trạng thái nông trại
+        return true;
     }
     return orig_FarmCtrl_InitCtrl(instance);
 }
@@ -243,12 +253,11 @@ bool hooked_FarmCtrl_initCtrl(void *instance) {
 
 @end
 
-// --- KHỞI CHẠY DYLIB & KÍCH HOẠT 6 LỆNH DOBBYHOOK CHÍNH THỨC ---
+// --- KHỞI CHẠY DYLIB & THỰC THI DOBBYHOOK ---
 __attribute__((constructor)) void initSheepctFullMasterMenu() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t imageBase = (uintptr_t)_dyld_get_image_header(0);
 
-        // Đã mở chú thích hoàn toàn - Sẵn sàng thực thi hack trực tiếp vào bộ nhớ:
         DobbyHook((void *)(imageBase + 0x83818), (void *)hooked_BattleRole_Update, (void **)&orig_BattleRole_Update);
         DobbyHook((void *)(imageBase + 0x242e3), (void *)hooked_AttackerSkill_HitAttacker, (void **)&orig_AttackerSkill_HitAttacker);
         DobbyHook((void *)(imageBase + 0x57a26f), (void *)hooked_TimeCtrl_Init, (void **)&orig_TimeCtrl_Init);
