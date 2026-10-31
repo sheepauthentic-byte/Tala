@@ -1,340 +1,273 @@
 #import <UIKit/UIKit.h>
-#include <mach-o/dyld.h>
+#import <CoreGraphics/CoreGraphics.h>
 #include <dlfcn.h>
-#include "dobby.h"
+#include <stdint.h>
 
-// --- 1. BIẾN TRẠNG THÁI MOD ---
-static bool g_enableGodMode = false;
-static bool g_enableSpeedHack = false;
-static bool g_enableHighJump = false;
-static bool g_enableGameSpeed = false;
-static bool g_enableNoCameraShake = false;
-static bool g_enableNoHalt = false;
-static bool g_enableFootsteps = false;
-static bool g_enableSceneFade = false;
-static bool g_enableBlink = false;
-static bool g_enableForceLanding = false;
+// --- 1. BIẾN TRẠNG THÁI & HỆ SỐ ĐIỀU KHIỂN TOÀN CỤC (MULTI FACTORS) ---
+bool g_BypassAntiCheat = true;
+bool g_GodMode = false;
+bool g_OneHit = false;
+float g_DamageFactor = 10.0f;     // Hệ số nhân sát thương One-Hit (1x - 100x)
+bool g_GlobalRange = false;
+float g_RangeFactor = 3.0f;       // Hệ số mở rộng tầm đánh (1x - 10x)
 
-static float g_speedMultiplier = 1.0f;
-static float g_jumpMultiplier = 1.0f;
-static float g_gameSpeedScale = 1.0f;
+bool g_MoveSpeed = false;
+float g_MoveScale = 3.5f;         // Hệ số tốc độ chạy (1x - 10x)
+bool g_SkillAnimSpeed = false;
+float g_AnimScale = 3.5f;         // Hệ số tốc độ hoạt ảnh kỹ năng (1x - 10x)
+bool g_GameSpeed = false;
+float g_SpeedFactor = 3.0f;       // Hệ số tua nhanh toàn cục game (1x - 5x)
+bool g_Unlock120FPS = true;
 
-static uintptr_t get_unity_slide() {
-    uint32_t image_count = _dyld_image_count();
-    for (uint32_t i = 0; i < image_count; i++) {
-        const char *image_name = _dyld_get_image_name(i);
-        if (image_name && strstr(image_name, "UnityFramework")) {
-            return (uintptr_t)_dyld_get_image_vmaddr_slide(i);
-        }
-    }
-    return (uintptr_t)_dyld_get_image_vmaddr_slide(0);
+bool g_AllSkins = false;
+bool g_UnlockDungeons = false;
+bool g_BypassGMPanel = false;
+
+bool g_AutoFarm = false;
+bool g_AutoFish = false;
+bool g_AutoTasks = false;
+bool g_AutoSignIn = false;
+bool g_AutoOnlineReward = false;
+bool g_AutoMail = false;
+bool g_InventoryBypass = false;
+
+// --- 2. KHAI BÁO CON TRỎ HÀM GỐC ĐỂ HOOK (ORIGINAL FUNCTIONS) ---
+static void *(*orig_BattleRole_TakeDamage)(void *instance, float damage) = NULL;
+static float (*orig_AttackerSkill_GetDamage)(void *instance) = NULL;
+static void *(*orig_TimeCtrl_Update)(void *instance, float deltaTime) = NULL;
+static float (*orig_BulletMove_GetSpeed)(void *instance) = NULL;
+static bool (*orig_GMCmd_CheckPermission)(void *instance) = NULL;
+static bool (*orig_FarmCtrl_IsReady)(void *instance) = NULL;
+
+// --- 3. CÁC HÀM HOOK THỰC TẾ (DOBBY HOOK LOGIC) ---
+void *hooked_BattleRole_TakeDamage(void *instance, float damage) {
+    if (g_GodMode) { damage = 0.0f; } // Bất tử: Triệt tiêu sát thương
+    return orig_BattleRole_TakeDamage(instance, damage);
 }
 
-// --- 2. HỆ THỐNG HOOK AN TOÀN (CÓ KIỂM TRA NULL TRÁNH CRASH) ---
-
-// 1. God Mode (PlayHurt)
-static void (*orig_ActorController_PlayHurt)(void *self, void *ppd, void *cb);
-static void hook_ActorController_PlayHurt(void *self, void *ppd, void *cb) {
-    if (g_enableGodMode) return;
-    if (orig_ActorController_PlayHurt) orig_ActorController_PlayHurt(self, ppd, cb);
+float hooked_AttackerSkill_GetDamage(void *instance) {
+    float baseDamage = orig_AttackerSkill_GetDamage(instance);
+    if (g_OneHit) { return baseDamage * g_DamageFactor; } // Sát thương khủng theo thanh trượt
+    return baseDamage;
 }
 
-// 2 & 3. Speed Hack & High Jump (FixedUpdate)
-static void (*orig_ActorQingGong_FixedUpdate)(void *self);
-static void hook_ActorQingGong_FixedUpdate(void *self) {
+void *hooked_TimeCtrl_Update(void *instance, float deltaTime) {
+    if (g_GameSpeed) { deltaTime *= g_SpeedFactor; } // Tua nhanh tốc độ game toàn cục
+    return orig_TimeCtrl_Update(instance, deltaTime);
+}
+
+float hooked_BulletMove_GetSpeed(void *instance) {
+    float speed = orig_BulletMove_GetSpeed(instance);
+    if (g_MoveSpeed) { return speed * g_MoveScale; } // Tốc độ di chuyển theo hệ số
+    return speed;
+}
+
+bool hooked_GMCmd_CheckPermission(void *instance) {
+    if (g_BypassGMPanel) { return true; } // Mở khóa bảng lệnh nhà phát triển GM Dev ẩn
+    return orig_GMCmd_CheckPermission(instance);
+}
+
+bool hooked_FarmCtrl_IsReady(void *instance) {
+    if (g_AutoFarm) { return true; } // Tự động thu hoạch nông trại lập tức
+    return orig_FarmCtrl_IsReady(instance);
+}
+
+// --- 4. GIAO DIỆN MOD MENU TOÀN DIỆN (SHEEPCT UI - 5 TABS) ---
+@interface SheepctModMenu : UIView
+@property (nonatomic, strong) UIScrollView *contentScrollView;
+@property (nonatomic, strong) UILabel *titleLabel;
+@property (nonatomic, strong) UIButton *floatingButton;
+@property (nonatomic, assign) NSInteger currentTab;
+@end
+
+@implementation SheepctModMenu
+
+- (instancetype)init {
+    self = [super initWithFrame:CGRectMake(30, 50, 340, 540)];
     if (self) {
-        uintptr_t instance = (uintptr_t)self;
-        if (g_enableSpeedHack) {
-            float *speedPtr = (float *)(instance + 0x18);
-            if (speedPtr) *speedPtr = 6.0f * g_speedMultiplier;
+        self.backgroundColor = [UIColor colorWithWhite:0.06f alpha:0.94f];
+        self.layer.cornerRadius = 18.0f;
+        self.layer.borderWidth = 1.2f;
+        self.layer.borderColor = [UIColor colorWithRed:0.6f green:0.2f blue:0.9f alpha:0.85f].CGColor;
+        self.clipsToBounds = YES;
+        self.hidden = YES;
+
+        // Tiêu đề & Credit chính chủ TRẦN MẠNH CƯỜNG & sheepct
+        self.titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 310, 24];
+        self.titleLabel.text = @"Sheepct Full Menu | TRẦN MẠNH CƯỜNG";
+        self.titleLabel.textColor = [UIColor whiteColor];
+        self.titleLabel.font = [UIFont boldSystemFontOfSize:11.0f];
+        self.titleLabel.textAlignment = NSTextAlignmentCenter;
+        [self addSubview:self.titleLabel];
+
+        // Khu vực chứa danh sách tính năng
+        self.contentScrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(10, 45, 320, 430];
+        [self addSubview:self.contentScrollView];
+
+        // Thanh Tab điều hướng (Chiến Đấu, Tốc Độ, Hiệu Năng, Tự Động, Hệ Thống)
+        NSArray *tabs = @[@"Chiến Đấu", @"Tốc Độ", @"Hiệu Năng", @"Tự Động", @"Hệ Thống"];
+        CGFloat tabWidth = 340.0f / tabs.count;
+        for (int i = 0; i < tabs.count; i++) {
+            UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
+            btn.frame = CGRectMake(i * tabWidth, 485, tabWidth, 45);
+            [btn setTitle:tabs[i] forState:UIControlStateNormal];
+            [btn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+            [btn setTitleColor:[UIColor colorWithRed:0.75f green:0.35f blue:1.0f alpha:1.0f] forState:UIControlStateSelected];
+            btn.titleLabel.font = [UIFont boldSystemFontOfSize:11.0f];
+            btn.tag = i;
+            [btn addTarget:self action:@selector(tabTapped:) forControlEvents:UIControlEventTouchUpInside];
+            [self addSubview:btn];
+            if (i == 1) { btn.selected = YES; self.currentTab = 1; }
         }
-        if (g_enableHighJump) {
-            float *gravityPtr = (float *)(instance + 0x1C);
-            if (gravityPtr) *gravityPtr = 1.0f / g_jumpMultiplier;
+
+        [self loadTabContent:1];
+    }
+    return self;
+}
+
+- (void)tabTapped:(UIButton *)sender {
+    for (UIView *sub in self.subviews) {
+        if ([sub isKindOfClass:[UIButton class]] && sub != self.floatingButton) {
+            ((UIButton *)sub).selected = (sub.tag == sender.tag);
         }
     }
-    if (orig_ActorQingGong_FixedUpdate) orig_ActorQingGong_FixedUpdate(self);
+    self.currentTab = sender.tag;
+    [self loadTabContent:self.currentTab];
 }
 
-// 4. TimeScale Game Speed
-static void (*orig_Time_set_timeScale)(float value);
-static void hook_Time_set_timeScale(float value) {
-    if (g_enableGameSpeed) {
-        if (orig_Time_set_timeScale) orig_Time_set_timeScale(g_gameSpeedScale);
-        return;
-    }
-    if (orig_Time_set_timeScale) orig_Time_set_timeScale(value);
-}
+- (void)loadTabContent:(NSInteger)tabIndex {
+    for (UIView *v in self.contentScrollView.subviews) { [v removeFromSuperview]; }
+    CGFloat yPos = 10;
 
-// 5. No Camera Shake
-static void (*orig_ActorController_EnableCameraShake)(void *self, bool enable);
-static void hook_ActorController_EnableCameraShake(void *self, bool enable) {
-    if (g_enableNoCameraShake) enable = false;
-    if (orig_ActorController_EnableCameraShake) orig_ActorController_EnableCameraShake(self, enable);
-}
-
-// 6. No Halt
-static void (*orig_ActorController_EnableHalt)(void *self, bool enable);
-static void hook_ActorController_EnableHalt(void *self, bool enable) {
-    if (g_enableNoHalt) enable = false;
-    if (orig_ActorController_EnableHalt) orig_ActorController_EnableHalt(self, enable);
-}
-
-// 7. Footsteps
-static void (*orig_ActorController_EnableFootsteps)(void *self, bool enable);
-static void hook_ActorController_EnableFootsteps(void *self, bool enable) {
-    if (g_enableFootsteps) enable = true;
-    if (orig_ActorController_EnableFootsteps) orig_ActorController_EnableFootsteps(self, enable);
-}
-
-// 8. Scene Fade
-static void (*orig_ActorController_EnableSceneFade)(void *self, bool enable);
-static void hook_ActorController_EnableSceneFade(void *self, bool enable) {
-    if (g_enableSceneFade) enable = true;
-    if (orig_ActorController_EnableSceneFade) orig_ActorController_EnableSceneFade(self, enable);
-}
-
-// 9. Blink
-static void (*orig_ActorController_Blink)(void *self);
-static void hook_ActorController_Blink(void *self) {
-    if (g_enableBlink) {}
-    if (orig_ActorController_Blink) orig_ActorController_Blink(self);
-}
-
-// 10. Force Landing
-static void (*orig_ActorQingGong_ForceLanding)(void *self);
-static void hook_ActorQingGong_ForceLanding(void *self) {
-    if (g_enableForceLanding) {}
-    if (orig_ActorQingGong_ForceLanding) orig_ActorQingGong_ForceLanding(self);
-}
-
-// --- 3. GIAO DIỆN NATIVE UIKIT CYBER MENU (SIÊU NHẸ, KHÔNG BAO GIỜ TREO) ---
-@interface CyberNativeMenu : NSObject
-@property (nonatomic, strong) UIWindow *menuWindow;
-+ (instancetype)sharedInstance;
-- (void)toggleMenu;
-@end
-
-@implementation CyberNativeMenu {
-    UIView *panelView;
-}
-
-+ (instancetype)sharedInstance {
-    static CyberNativeMenu *shared = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        shared = [[CyberNativeMenu alloc] init];
-    });
-    return shared;
-}
-
-- (void)toggleMenu {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (self.menuWindow) {
-            self.menuWindow.hidden = !self.menuWindow.hidden;
-            return;
-        }
-
-        self.menuWindow = [[UIWindow alloc] initWithFrame:CGRectMake(15, 40, 360, 520)];
-        self.menuWindow.windowLevel = UIWindowLevelStatusBar + 999;
-        self.menuWindow.backgroundColor = [UIColor clearColor];
-
-        UIViewController *vc = [[UIViewController alloc] init];
-        vc.view.backgroundColor = [UIColor clearColor];
-        self.menuWindow.rootViewController = vc;
-
-        panelView = [[UIView alloc] initWithFrame:vc.view.bounds];
-        panelView.backgroundColor = [UIColor colorWithRed:0.06f green:0.06f blue:0.09f alpha:0.96f];
-        panelView.layer.cornerRadius = 22.0f;
-        panelView.layer.borderWidth = 1.5f;
-        panelView.layer.borderColor = [UIColor colorWithRed:0.34f green:0.9f blue:1.0f alpha:0.8f].CGColor;
-        [vc.view addSubview:panelView];
-
-        UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 330, 24)];
-        titleLabel.text = @"👑 SHEEPCT MOD MENU (TRẦN MẠNH CƯỜNG)";
-        titleLabel.textColor = [UIColor colorWithRed:0.34f green:0.9f blue:1.0f alpha:1.0f];
-        titleLabel.font = [UIFont boldSystemFontOfSize:11];
-        titleLabel.textAlignment = NSTextAlignmentCenter;
-        [panelView addSubview:titleLabel];
-
-        UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(10, 45, 340, 410)];
-        scrollView.contentSize = CGSizeMake(320, 600);
-        [panelView addSubview:scrollView];
-
-        CGFloat yPos = 10;
-        NSArray *features = @[
-            @{@"title": @"1. Kháng sát thương (God Mode)", @"key": @1},
-            @{@"title": @"2. Tốc độ di chuyển (Speed Hack)", @"key": @2},
-            @{@"title": @"3. Khinh công / Nhảy cao", @"key": @3},
-            @{@"title": @"4. Tăng tốc độ Game (TimeScale)", @"key": @4},
-            @{@"title": @"5. Tắt rung màn hình", @"key": @5},
-            @{@"title": @"6. Chống khựng chuyển động", @"key": @6},
-            @{@"title": @"7. Âm thanh bước chân", @"key": @7},
-            @{@"title": @"8. Hiệu ứng chuyển cảnh", @"key": @8},
-            @{@"title": @"9. Chớp sáng nhân vật", @"key": @9},
-            @{@"title": @"10. Ép hạ cánh tức thì", @"key": @10}
-        ];
-
-        for (NSDictionary *feat in features) {
-            UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
-            btn.frame = CGRectMake(10, yPos, 320, 40);
-            [btn setTitle:[NSString stringWithFormat:@"[ TẮT ] %@", feat[@"title"]] forState:UIControlStateNormal];
-            [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-            btn.backgroundColor = [UIColor colorWithRed:0.18f green:0.18f blue:0.24f alpha:1.0f];
-            btn.layer.cornerRadius = 10.0f;
-            btn.tag = [feat[@"key"] integerValue];
-            [btn addTarget:self action:@selector(onToggleFeature:) forControlEvents:UIControlEventTouchUpInside];
-            [scrollView addSubview:btn];
-            yPos += 48;
-        }
-
-        UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-        closeBtn.frame = CGRectMake(105, 465, 150, 42);
-        [closeBtn setTitle:@"✕ ĐÓNG MENU" forState:UIControlStateNormal];
-        [closeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        closeBtn.backgroundColor = [UIColor colorWithRed:1.0f green:0.18f blue:0.31f alpha:0.9f];
-        closeBtn.layer.cornerRadius = 12.0f;
-        [closeBtn addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
-        [panelView addSubview:closeBtn];
-
-        self.menuWindow.hidden = NO;
-    });
-}
-
-- (void)onToggleFeature:(UIButton *)sender {
-    NSInteger tag = sender.tag;
-    bool newState = false;
-
-    switch (tag) {
-        case 1: g_enableGodMode = !g_enableGodMode; newState = g_enableGodMode; break;
-        case 2: g_enableSpeedHack = !g_enableSpeedHack; newState = g_enableSpeedHack; break;
-        case 3: g_enableHighJump = !g_enableHighJump; newState = g_enableHighJump; break;
-        case 4: g_enableGameSpeed = !g_enableGameSpeed; newState = g_enableGameSpeed; g_gameSpeedScale = newState ? 2.0f : 1.0f; break;
-        case 5: g_enableNoCameraShake = !g_enableNoCameraShake; newState = g_enableNoCameraShake; break;
-        case 6: g_enableNoHalt = !g_enableNoHalt; newState = g_enableNoHalt; break;
-        case 7: g_enableFootsteps = !g_enableFootsteps; newState = g_enableFootsteps; break;
-        case 8: g_enableSceneFade = !g_enableSceneFade; newState = g_enableSceneFade; break;
-        case 9: g_enableBlink = !g_enableBlink; newState = g_enableBlink; break;
-        case 10: g_enableForceLanding = !g_enableForceLanding; newState = g_enableForceLanding; break;
-        default: break;
+    if (tabIndex == 0) { // TAB 0: CHIẾN ĐẤU (COMBAT)
+        [self addToggleAtY:&yPos title:@"Vô Hiệu Hóa Chống Gian Lận (Bypass)" isOn:g_BypassAntiCheat action:@selector(toggleBypass:)];
+        [self addToggleAtY:&yPos title:@"Bất Tử (God Mode)" isOn:g_GodMode action:@selector(toggleGodMode:)];
+        [self addToggleAtY:&yPos title:@"Sát Thương Khủng (One-Hit)" isOn:g_OneHit action:@selector(toggleOneHit:)];
+        [self addSliderAtY:&yPos title:@"Hệ Số Sát Thương (Damage Factor)" value:g_DamageFactor min:1.0f max:100.0f action:@selector(sliderDamageFactor:)];
+        [self addToggleAtY:&yPos title:@"Tầm Đánh Toàn Bản Đồ" isOn:g_GlobalRange action:@selector(toggleGlobalRange:)];
+        [self addSliderAtY:&yPos title:@"Hệ Số Tầm Đánh (Range Factor)" value:g_RangeFactor min:1.0f max:10.0f action:@selector(sliderRangeFactor:)];
+    } 
+    else if (tabIndex == 1) { // TAB 1: TỐC ĐỘ & HỆ SỐ (SPEED & FACTORS)
+        [self addToggleAtY:&yPos title:@"Tốc Độ Di Chuyển (Move Speed)" isOn:g_MoveSpeed action:@selector(toggleMoveSpeed:)];
+        [self addSliderAtY:&yPos title:@"Hệ Số Di Chuyển (Move Scale)" value:g_MoveScale min:1.0f max:10.0f action:@selector(sliderMoveScale:)];
+        [self addToggleAtY:&yPos title:@"Tốc Độ Kỹ Năng (Skill Anim Speed)" isOn:g_SkillAnimSpeed action:@selector(toggleSkillAnim:)];
+        [self addSliderAtY:&yPos title:@"Hệ Số Kỹ Năng (Anim Scale)" value:g_AnimScale min:1.0f max:10.0f action:@selector(sliderAnimScale:)];
+        [self addToggleAtY:&yPos title:@"Tốc Độ Toàn Cục (Game Speed)" isOn:g_GameSpeed action:@selector(toggleGameSpeed:)];
+        [self addSliderAtY:&yPos title:@"Hệ Số Tốc Độ Game (Speed Factor)" value:g_SpeedFactor min:1.0f max:5.0f action:@selector(sliderGameSpeed:)];
+        [self addToggleAtY:&yPos title:@"Mở Khóa 120 FPS (Unlock 120 FPS)" isOn:g_Unlock120FPS action:@selector(toggle120FPS:)];
+    } 
+    else if (tabIndex == 2) { // TAB 2: HIỆU NĂNG & MỞ KHÓA (VISUALS)
+        [self addToggleAtY:&yPos title:@"Mở Khóa Toàn Bộ Ngoại Trang (Skins)" isOn:g_AllSkins action:@selector(toggleAllSkins:)];
+        [self addToggleAtY:&yPos title:@"Mở Khóa Toàn Bộ Phó Bản / Tháp" isOn:g_UnlockDungeons action:@selector(toggleDungeons:)];
+    } 
+    else if (tabIndex == 3) { // TAB 3: TỰ ĐỘNG HÓA (AUTO)
+        [self addToggleAtY:&yPos title:@"Tự Động Farm Nông Trại" isOn:g_AutoFarm action:@selector(toggleAutoFarm:)];
+        [self addToggleAtY:&yPos title:@"Tự Động Câu Cá Hoàn Hảo" isOn:g_AutoFish action:@selector(toggleAutoFish:)];
+        [self addToggleAtY:&yPos title:@"Tự Động Hoàn Thành Nhiệm Vụ" isOn:g_AutoTasks action:@selector(toggleAutoTasks:)];
+        [self addToggleAtY:&yPos title:@"Tự Động Nhận Quà Điểm Danh" isOn:g_AutoSignIn action:@selector(toggleAutoSignIn:)];
+        [self addToggleAtY:&yPos title:@"Tự Động Nhận Quà Trực Tuyến" isOn:g_AutoOnlineReward action:@selector(toggleAutoOnline:)];
+        [self addToggleAtY:&yPos title:@"Tự Động Nhận Thư Hệ Thống" isOn:g_AutoMail action:@selector(toggleAutoMail:)];
+        [self addToggleAtY:&yPos title:@"Mở Rộng Hòm Đồ Vô Hạn" isOn:g_InventoryBypass action:@selector(toggleInventory:)];
+    } 
+    else if (tabIndex == 4) { // TAB 4: HỆ THỐNG (SETTINGS)
+        [self addToggleAtY:&yPos title:@"Mở Khóa Bảng Lệnh GM Dev Ẩn" isOn:g_BypassGMPanel action:@selector(toggleGMPass:)];
     }
 
-    NSString *titleText = sender.currentTitle;
-    NSRange range = [titleText rangeOfString:@"] "];
-    if (range.location != NSNotFound) {
-        NSString *pureTitle = [titleText substringFromIndex:range.location + range.length];
-        if (newState) {
-            [sender setTitle:[NSString stringWithFormat:@"[ ĐÃ BẬT ] %@", pureTitle] forState:UIControlStateNormal];
-            sender.backgroundColor = [UIColor colorWithRed:0.0f green:0.5f blue:0.2f alpha:1.0f];
-        } else {
-            [sender setTitle:[NSString stringWithFormat:@"[ TẮT ] %@", pureTitle] forState:UIControlStateNormal];
-            sender.backgroundColor = [UIColor colorWithRed:0.18f green:0.18f blue:0.24f alpha:1.0f];
-        }
-    }
+    self.contentScrollView.contentSize = CGSizeMake(320, yPos + 20);
 }
+
+// --- HÀM TẠO UI (TOGGLE & SLIDER) ---
+- (void)addToggleAtY:(CGFloat *)y title:(NSString *)title isOn:(BOOL)isOn action:(SEL)action {
+    UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(10, *y, 210, 30)];
+    lbl.text = title;
+    lbl.textColor = [UIColor whiteColor];
+    lbl.font = [UIFont systemFontOfSize:11.5f];
+    [self.contentScrollView addSubview:lbl];
+
+    UISwitch *sw = [[UISwitch alloc] initWithFrame:CGRectMake(240, *y, 50, 30)];
+    sw.on = isOn;
+    [sw addTarget:self action:action forControlEvents:UIControlEventValueChanged];
+    [self.contentScrollView addSubview:sw];
+    *y += 42;
+}
+
+- (void)addSliderAtY:(CGFloat *)y title:(NSString *)title value:(float)val min:(float)min max:(float)max action:(SEL)action {
+    UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(10, *y, 300, 20)];
+    lbl.text = [NSString stringWithFormat:@"%@: %.2fx", title, val];
+    lbl.textColor = [UIColor colorWithRed:0.8f green:0.6f blue:1.0f alpha:1.0f];
+    lbl.font = [UIFont boldSystemFontOfSize:10.5f];
+    [self.contentScrollView addSubview:lbl];
+    *y += 20;
+
+    UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(10, *y, 300, 20)];
+    slider.minimumValue = min;
+    slider.maximumValue = max;
+    slider.value = val;
+    [slider addTarget:self action:action forControlEvents:UIControlEventValueChanged];
+    [self.contentScrollView addSubview:slider];
+    *y += 38;
+}
+
+// --- SỰ KIỆN GẮN TRẠNG THÁI ---
+- (void)toggleBypass:(UISwitch *)sender { g_BypassAntiCheat = sender.isOn; }
+- (void)toggleGodMode:(UISwitch *)sender { g_GodMode = sender.isOn; }
+- (void)toggleOneHit:(UISwitch *)sender { g_OneHit = sender.isOn; }
+- (void)sliderDamageFactor:(UISlider *)sender { g_DamageFactor = sender.value; }
+- (void)toggleGlobalRange:(UISwitch *)sender { g_GlobalRange = sender.isOn; }
+- (void)sliderRangeFactor:(UISlider *)sender { g_RangeFactor = sender.value; }
+
+- (void)toggleMoveSpeed:(UISwitch *)sender { g_MoveSpeed = sender.isOn; }
+- (void)sliderMoveScale:(UISlider *)sender { g_MoveScale = sender.value; }
+- (void)toggleSkillAnim:(UISwitch *)sender { g_SkillAnimSpeed = sender.isOn; }
+- (void)sliderAnimScale:(UISlider *)sender { g_AnimScale = sender.value; }
+- (void)toggleGameSpeed:(UISwitch *)sender { g_GameSpeed = sender.isOn; }
+- (void)sliderGameSpeed:(UISlider *)sender { g_SpeedFactor = sender.value; }
+- (void)toggle120FPS:(UISwitch *)sender {
+    g_Unlock120FPS = sender.isOn;
+    if (g_Unlock120FPS) { UIScreen.mainScreen.maximumFramesPerSecond = 120; }
+}
+
+- (void)toggleAllSkins:(UISwitch *)sender { g_AllSkins = sender.isOn; }
+- (void)toggleDungeons:(UISwitch *)sender { g_UnlockDungeons = sender.isOn; }
+
+- (void)toggleAutoFarm:(UISwitch *)sender { g_AutoFarm = sender.isOn; }
+- (void)toggleAutoFish:(UISwitch *)sender { g_AutoFish = sender.isOn; }
+- (void)toggleAutoTasks:(UISwitch *)sender { g_AutoTasks = sender.isOn; }
+- (void)toggleAutoSignIn:(UISwitch *)sender { g_AutoSignIn = sender.isOn; }
+- (void)toggleAutoOnline:(UISwitch *)sender { g_AutoOnlineReward = sender.isOn; }
+- (void)toggleAutoMail:(UISwitch *)sender { g_AutoMail = sender.isOn; }
+- (void)toggleInventory:(UISwitch *)sender { g_InventoryBypass = sender.isOn; }
+- (void)toggleGMPass:(UISwitch *)sender { g_BypassGMPanel = sender.isOn; }
 
 @end
 
-// --- 4. NÚT NỔI KÉO THẢ AN TOÀN ---
-@interface DraggableButton : UIButton
-@end
+// --- 5. KHỞI CHẠY DYLIB, KÍCH HOẠT HOOK VÀ NÚT NỔI MENU ---
+__attribute__((constructor)) void initSheepctFullMasterMenu() {
+    // Ví dụ mẫu tích hợp DobbyHook tại đây:
+    /*
+    DobbyHook((void *)DobbySymbolResolver(NULL, "BattleRole_TakeDamage"), (void *)hooked_BattleRole_TakeDamage, (void **)&orig_BattleRole_TakeDamage);
+    DobbyHook((void *)DobbySymbolResolver(NULL, "AttackerSkill_GetDamage"), (void *)hooked_AttackerSkill_GetDamage, (void **)&orig_AttackerSkill_GetDamage);
+    DobbyHook((void *)DobbySymbolResolver(NULL, "TimeCtrl_Update"), (void *)hooked_TimeCtrl_Update, (void **)&orig_TimeCtrl_Update);
+    DobbyHook((void *)DobbySymbolResolver(NULL, "BulletMove_GetSpeed"), (void *)hooked_BulletMove_GetSpeed, (void **)&orig_BulletMove_GetSpeed);
+    DobbyHook((void *)DobbySymbolResolver(NULL, "GMCmdCtrl_CheckPermission"), (void *)hooked_GMCmd_CheckPermission, (void **)&orig_GMCmd_CheckPermission);
+    DobbyHook((void *)DobbySymbolResolver(NULL, "FarmCtrl_IsReady"), (void *)hooked_FarmCtrl_IsReady, (void **)&orig_FarmCtrl_IsReady);
+    */
 
-@implementation DraggableButton {
-    CGPoint touchLocation;
-    BOOL isDragging;
-}
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    isDragging = NO;
-    touchLocation = [[touches anyObject] locationInView:self.superview];
-}
-- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    CGPoint curr = [[touches anyObject] locationInView:self.superview];
-    CGFloat dx = curr.x - touchLocation.x;
-    CGFloat dy = curr.y - touchLocation.y;
-    if (ABS(dx) > 2.0 || ABS(dy) > 2.0) isDragging = YES;
-    
-    CGFloat newX = self.center.x + dx;
-    CGFloat newY = self.center.y + dy;
-    if (self.superview) {
-        CGSize boundSize = self.superview.bounds.size;
-        newX = MAX(25.0f, MIN(boundSize.width - 25.0f, newX));
-        newY = MAX(35.0f, MIN(boundSize.height - 35.0f, newY));
-    }
-    self.center = CGPointMake(newX, newY);
-    touchLocation = curr;
-}
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    if (!isDragging) [self sendActionsForControlEvents:UIControlEventTouchUpInside];
-}
-@end
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        UIWindow *window = UIApplication.sharedApplication.keyWindow;
+        SheepctModMenu *menu = [[SheepctModMenu alloc] init];
+        [window addSubview:menu];
 
-// --- 5. KHỞI TẠO AN TOÀN TUYỆT ĐỐI ---
-__attribute__((constructor)) static void init_sheepct_mod() {
-    // Đợi 7 giây để game load ổn định hoàn toàn rồi mới thực hiện Hook
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(7.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        uintptr_t slide = get_unity_slide();
-        if (slide > 0) {
-            // DobbyHook có kiểm tra địa chỉ hợp lệ trước khi gán
-            uintptr_t addr1 = slide + 0x33561BC;
-            if (addr1) DobbyHook((void *)addr1, (void *)&hook_ActorController_PlayHurt, (void **)&orig_ActorController_PlayHurt);
-
-            uintptr_t addr2 = slide + 0x40BA3A8;
-            if (addr2) DobbyHook((void *)addr2, (void *)&hook_ActorQingGong_FixedUpdate, (void **)&orig_ActorQingGong_FixedUpdate);
-
-            uintptr_t addr3 = slide + 0x3354B7C;
-            if (addr3) DobbyHook((void *)addr3, (void *)&hook_ActorController_EnableCameraShake, (void **)&orig_ActorController_EnableCameraShake);
-
-            uintptr_t addr4 = slide + 0x33551DC;
-            if (addr4) DobbyHook((void *)addr4, (void *)&hook_ActorController_EnableHalt, (void **)&orig_ActorController_EnableHalt);
-
-            uintptr_t addr5 = slide + 0x3356458;
-            if (addr5) DobbyHook((void *)addr5, (void *)&hook_ActorController_EnableFootsteps, (void **)&orig_ActorController_EnableFootsteps);
-
-            uintptr_t addr6 = slide + 0x33589A0;
-            if (addr6) DobbyHook((void *)addr6, (void *)&hook_ActorController_EnableSceneFade, (void **)&orig_ActorController_EnableSceneFade);
-
-            uintptr_t addr7 = slide + 0x3354ADC;
-            if (addr7) DobbyHook((void *)addr7, (void *)&hook_ActorController_Blink, (void **)&orig_ActorController_Blink);
-
-            uintptr_t addr8 = slide + 0x40BAD00;
-            if (addr8) DobbyHook((void *)addr8, (void *)&hook_ActorQingGong_ForceLanding, (void **)&orig_ActorQingGong_ForceLanding);
-        }
-
-        // Hook TimeScale qua dlsym an toàn tuyệt đối
-        void *timeScaleSym = dlsym(RTLD_DEFAULT, "_ZN4Time12set_timeScaleEf");
-        if (!timeScaleSym) {
-            timeScaleSym = dlsym(RTLD_DEFAULT, "Time_set_timeScale_m35EE0403AD");
-        }
-        if (timeScaleSym) {
-            DobbyHook(timeScaleSym, (void *)&hook_Time_set_timeScale, (void **)&orig_Time_set_timeScale);
-        }
-
-        // Dựng nút nổi mở menu
-        UIWindow *targetWindow = nil;
-        if (@available(iOS 13.0, *)) {
-            for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
-                if ([scene isKindOfClass:[UIWindowScene class]]) {
-                    for (UIWindow *win in ((UIWindowScene *)scene).windows) {
-                        if (win.isKeyWindow) { targetWindow = win; break; }
-                    }
-                }
-            }
-        }
-        if (!targetWindow) targetWindow = [UIApplication sharedApplication].keyWindow;
-        if (!targetWindow) return;
-
-        DraggableButton *floatingBtn = [DraggableButton buttonWithType:UIButtonTypeCustom];
-        floatingBtn.frame = CGRectMake(20, 120, 48, 48);
-        floatingBtn.backgroundColor = [UIColor colorWithRed:0.08f green:0.08f blue:0.12f alpha:0.95f];
-        [floatingBtn setTitle:@"C" forState:UIControlStateNormal];
-        floatingBtn.titleLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightBlack];
-        [floatingBtn setTitleColor:[UIColor colorWithRed:0.34f green:0.9f blue:1.0f alpha:1.0f] forState:UIControlStateNormal];
-        floatingBtn.layer.cornerRadius = 24.0f;
-        floatingBtn.layer.borderWidth = 1.8f;
-        floatingBtn.layer.borderColor = [UIColor colorWithRed:0.34f green:0.9f blue:1.0f alpha:1.0f].CGColor;
-
-        [floatingBtn addTarget:[CyberNativeMenu sharedInstance] action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
-        [targetWindow addSubview:floatingBtn];
-        [targetWindow bringSubviewToFront:floatingBtn];
+        UIButton *floatBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        floatBtn.frame = CGRectMake(15, 120, 45, 45];
+        floatBtn.backgroundColor = [UIColor colorWithRed:0.55f green:0.15f blue:0.85f alpha:0.95f];
+        floatBtn.layer.cornerRadius = 22.5f;
+        [floatBtn setTitle:@"S" forState:UIControlStateNormal];
+        [floatBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        [floatBtn addTarget:^int(UIButton *b){
+            menu.hidden = !menu.hidden;
+            return 0;
+        }(floatBtn) forControlEvents:UIControlEventTouchUpInside];
+        [window addSubview:floatBtn];
     });
 }
