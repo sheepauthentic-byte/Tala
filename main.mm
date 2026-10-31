@@ -3,23 +3,21 @@
 #include <dlfcn.h>
 #include "dobby.h"
 
-// --- 1. BIẾN TRẠNG THÁI TOÀN CỤC ---
-static bool g_enableGodMode = false;          // 1. Kháng sát thương (PlayHurt)
-static bool g_enableSpeedHack = false;        // 2. Tốc độ di chuyển nhân vật (FixedUpdate)
-static bool g_enableHighJump = false;         // 3. Khinh công / Nhảy cao (FixedUpdate)
-static bool g_enableGameSpeed = false;        // 4. Tăng tốc độ toàn cục game (Time.timeScale)
-static bool g_enableNoCameraShake = false;    // 5. Tắt rung màn hình (EnableCameraShake)
-static bool g_enableNoHalt = false;           // 6. Chống khựng chuyển động (EnableHalt)
-static bool g_enableFootsteps = false;        // 7. Âm thanh bước chân (EnableFootsteps)
-static bool g_enableSceneFade = false;        // 8. Hiệu ứng chuyển cảnh (EnableSceneFade)
-static bool g_enableBlink = false;            // 9. Chớp sáng nhân vật (Blink)
-static bool g_enableForceLanding = false;     // 10. Ép hạ cánh tức thì (ForceLanding)
+static bool g_enableGodMode = false;
+static bool g_enableSpeedHack = false;
+static bool g_enableHighJump = false;
+static bool g_enableGameSpeed = false;
+static bool g_enableNoCameraShake = false;
+static bool g_enableNoHalt = false;
+static bool g_enableFootsteps = false;
+static bool g_enableSceneFade = false;
+static bool g_enableBlink = false;
+static bool g_enableForceLanding = false;
 
 static float g_speedMultiplier = 1.0f;        
 static float g_jumpMultiplier = 1.0f;         
 static float g_gameSpeedScale = 1.0f;         
 
-// --- HÀM LẤY SLIDE CHUẨN CỦA UNITYFRAMEWORK ---
 static uintptr_t get_unity_slide() {
     uint32_t image_count = _dyld_image_count();
     for (uint32_t i = 0; i < image_count; i++) {
@@ -31,35 +29,28 @@ static uintptr_t get_unity_slide() {
     return (uintptr_t)_dyld_get_image_vmaddr_slide(0);
 }
 
-// ==========================================
-// --- 2. HỆ THỐNG HOOK THẬT CHO TỪNG HÀM ---
-// ==========================================
-
-// 1. PlayHurt (RVA: 0x33561BC) - God Mode
 static void (*orig_ActorController_PlayHurt)(void *self, void *ppd, void *cb);
 static void hook_ActorController_PlayHurt(void *self, void *ppd, void *cb) {
     if (g_enableGodMode) return;
     orig_ActorController_PlayHurt(self, ppd, cb);
 }
 
-// 2. FixedUpdate (RVA: 0x40BA3A8) - Speed & Jump
 static void (*orig_ActorQingGong_FixedUpdate)(void *self);
 static void hook_ActorQingGong_FixedUpdate(void *self) {
     if (self) {
         uintptr_t instance = (uintptr_t)self;
         if (g_enableSpeedHack) {
-            float *speedPtr = (float *)(instance + 0x18); // forwardSpeed
+            float *speedPtr = (float *)(instance + 0x18);
             if (speedPtr) *speedPtr = 6.0f * g_speedMultiplier;
         }
         if (g_enableHighJump) {
-            float *gravityPtr = (float *)(instance + 0x1C); // m_GravityMultiplier
+            float *gravityPtr = (float *)(instance + 0x1C);
             if (gravityPtr) *gravityPtr = 1.0f / g_jumpMultiplier;
         }
     }
     orig_ActorQingGong_FixedUpdate(self);
 }
 
-// 3. Game Speed Hack (Time.set_timeScale trong UnityEngine)
 static void (*orig_Time_set_timeScale)(float value);
 static void hook_Time_set_timeScale(float value) {
     if (g_enableGameSpeed) {
@@ -69,51 +60,42 @@ static void hook_Time_set_timeScale(float value) {
     orig_Time_set_timeScale(value);
 }
 
-// 4. EnableCameraShake (RVA: 0x3354B7C)
 static void (*orig_ActorController_EnableCameraShake)(void *self, bool enable);
 static void hook_ActorController_EnableCameraShake(void *self, bool enable) {
     if (g_enableNoCameraShake) enable = false;
     orig_ActorController_EnableCameraShake(self, enable);
 }
 
-// 5. EnableHalt (RVA: 0x33551DC)
 static void (*orig_ActorController_EnableHalt)(void *self, bool enable);
 static void hook_ActorController_EnableHalt(void *self, bool enable) {
     if (g_enableNoHalt) enable = false;
     orig_ActorController_EnableHalt(self, enable);
 }
 
-// 6. EnableFootsteps (RVA: 0x3356458)
 static void (*orig_ActorController_EnableFootsteps)(void *self, bool enable);
 static void hook_ActorController_EnableFootsteps(void *self, bool enable) {
     if (g_enableFootsteps) enable = true;
     orig_ActorController_EnableFootsteps(self, enable);
 }
 
-// 7. EnableSceneFade (RVA: 0x33589A0)
 static void (*orig_ActorController_EnableSceneFade)(void *self, bool enable);
 static void hook_ActorController_EnableSceneFade(void *self, bool enable) {
     if (g_enableSceneFade) enable = true;
     orig_ActorController_EnableSceneFade(self, enable);
 }
 
-// 8. Blink (RVA: 0x3354ADC)
 static void (*orig_ActorController_Blink)(void *self);
 static void hook_ActorController_Blink(void *self) {
     if (g_enableBlink) {}
     orig_ActorController_Blink(self);
 }
 
-// 9. ForceLanding (RVA: 0x40BAD00)
 static void (*orig_ActorQingGong_ForceLanding)(void *self);
 static void hook_ActorQingGong_ForceLanding(void *self) {
     if (g_enableForceLanding) {}
     orig_ActorQingGong_ForceLanding(self);
 }
 
-// ==========================================
-// --- 3. GIAO DIỆN MOD MENU VIỆT HÓA ---
-// ==========================================
 @interface SheepctModMenuController : NSObject
 @property (nonatomic, strong) UIWindow *menuWindow;
 + (instancetype)sharedInstance;
@@ -336,7 +318,6 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 
 @end
 
-// --- NÚT NỔI KÉO THẢ ---
 @interface DraggableButton : UIButton
 @end
 
@@ -369,7 +350,6 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 }
 @end
 
-// --- KHỞI TẠO VÀ KÍCH HOẠT DOBBY HOOK ---
 __attribute__((constructor)) static void init_sheepct_mod() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t slide = get_unity_slide();
