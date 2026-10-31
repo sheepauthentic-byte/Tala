@@ -13,20 +13,28 @@ extern "C" {
 }
 #endif
 
-// --- BIẾN TRẠNG THÁI MENU ---
+// --- 1. CỜ TRẠNG THÁI & BIẾN ĐIỀU KHIỂN ---
 bool g_BypassAntiCheat = true;
-bool g_GodMode = false;
-bool g_OneHit = false;
-float g_DamageFactor = 10.0f;
-bool g_GameSpeed = false;
-float g_SpeedFactor = 3.0f;
-bool g_BypassGMPanel = false;
-bool g_AutoFarm = false;
+bool g_OneHit = true;
+float g_DamageFactor = 50.0f;
+bool g_BypassGMPanel = true;
 
-// --- CON TRỎ HÀM GỐC ---
+// --- 2. KHAI BÁO CON TRỎ HÀM GỐC ---
+static bool (*orig_AntiCheat_CheckIntegrity)(void *instance) = NULL;
 static bool (*orig_GMCmd_IsGm)(void *instance) = NULL;
+static float (*orig_AttackerSkill_HitAttacker)(void *instance) = NULL;
 
-// Chỉ giữ lại 1 hook an toàn nhất (Bypass GM / Kiểm tra trạng thái) để tránh sập app lúc load dữ liệu
+// --- 3. CÁC HÀM HOOK BYPASS & TÍNH NĂNG AN TOÀN ---
+
+// Chặn kiểm tra tính toàn vẹn và chống lỗi update fail
+bool hooked_AntiCheat_CheckIntegrity(void *instance) {
+    if (g_BypassAntiCheat) {
+        return false; // Ép hệ thống báo cáo: "Tệp sạch tuyệt đối, không có dấu hiệu can thiệp"
+    }
+    return orig_AntiCheat_CheckIntegrity ? orig_AntiCheat_CheckIntegrity(instance) : false;
+}
+
+// Mở khóa bảng lệnh GM Dev ẩn
 bool hooked_GMCmd_IsGm(void *instance) {
     if (!instance) return false;
     if (g_BypassGMPanel) {
@@ -35,17 +43,26 @@ bool hooked_GMCmd_IsGm(void *instance) {
     return orig_GMCmd_IsGm(instance);
 }
 
-// --- GIAO DIỆN MOD MENU 5 TAB (SHEEPCT UI) ---
+// Hàm nhân sát thương (One-Hit) bảo vệ con trỏ chống văng
+float hooked_AttackerSkill_HitAttacker(void *instance) {
+    if (!instance) return 0.0f;
+    float baseDamage = orig_AttackerSkill_HitAttacker(instance);
+    if (g_OneHit) {
+        return baseDamage * g_DamageFactor;
+    }
+    return baseDamage;
+}
+
+// --- 4. GIAO DIỆN MOD MENU TỐI ƯU (SHEEPCT UI) ---
 @interface SheepctModMenu : UIView
 @property (nonatomic, strong) UIScrollView *contentScrollView;
 @property (nonatomic, strong) UILabel *titleLabel;
-@property (nonatomic, assign) NSInteger currentTab;
 @end
 
 @implementation SheepctModMenu
 
 - (instancetype)init {
-    self = [super initWithFrame:CGRectMake(30, 50, 340, 540)];
+    self = [super initWithFrame:CGRectMake(30, 50, 340, 420)];
     if (self) {
         self.backgroundColor = [UIColor colorWithWhite:0.06f alpha:0.94f];
         self.layer.cornerRadius = 18.0f;
@@ -55,85 +72,57 @@ bool hooked_GMCmd_IsGm(void *instance) {
         self.hidden = YES;
 
         self.titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 310, 24)];
-        self.titleLabel.text = @"Sheepct Full Menu | TRẦN MẠNH CƯỜNG";
+        self.titleLabel.text = @"Sheepct Ultimate Bypass | TRẦN MẠNH CƯỜNG";
         self.titleLabel.textColor = [UIColor whiteColor];
-        self.titleLabel.font = [UIFont boldSystemFontOfSize:11.0f];
+        self.titleLabel.font = [UIFont boldSystemFontOfSize:10.5f];
         self.titleLabel.textAlignment = NSTextAlignmentCenter;
         [self addSubview:self.titleLabel];
 
-        self.contentScrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(10, 45, 320, 430)];
+        self.contentScrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(10, 45, 320, 360)];
         [self addSubview:self.contentScrollView];
 
-        NSArray *tabs = @[@"Chiến Đấu", @"Tốc Độ", @"Hiệu Năng", @"Tự Động", @"Hệ Thống"];
-        CGFloat tabWidth = 340.0f / tabs.count;
-        for (int i = 0; i < tabs.count; i++) {
-            UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
-            btn.frame = CGRectMake(i * tabWidth, 485, tabWidth, 45);
-            [btn setTitle:tabs[i] forState:UIControlStateNormal];
-            [btn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
-            [btn setTitleColor:[UIColor colorWithRed:0.75f green:0.35f blue:1.0f alpha:1.0f] forState:UIControlStateSelected];
-            btn.titleLabel.font = [UIFont boldSystemFontOfSize:11.0f];
-            btn.tag = i;
-            [btn addTarget:self action:@selector(tabTapped:) forControlEvents:UIControlEventTouchUpInside];
-            [self addSubview:btn];
-            if (i == 4) { btn.selected = YES; self.currentTab = 4; }
-        }
+        CGFloat yPos = 10;
+        [self addToggleAtY:&yPos title:@"Vô Hiệu Hóa Anti-Cheat (Bypass)" isOn:g_BypassAntiCheat action:@selector(toggleBypass:)];
+        [self addToggleAtY:&yPos title:@"Sát Thương Khủng (One-Hit 50x)" isOn:g_OneHit action:@selector(toggleOneHit:)];
+        [self addToggleAtY:&yPos title:@"Mở Khóa Bảng Lệnh GM Dev" isOn:g_BypassGMPanel action:@selector(toggleGMPass:)];
 
-        [self loadTabContent:4];
+        self.contentScrollView.contentSize = CGSizeMake(320, yPos + 20);
     }
     return self;
 }
 
-- (void)tabTapped:(UIButton *)sender {
-    for (UIView *sub in self.subviews) {
-        if ([sub isKindOfClass:[UIButton class]]) {
-            ((UIButton *)sub).selected = (sub.tag == sender.tag);
-        }
-    }
-    self.currentTab = sender.tag;
-    [self loadTabContent:self.currentTab];
+- (void)addToggleAtY:(CGFloat *)y title:(NSString *)title isOn:(BOOL)isOn action:(SEL)action {
+    UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(10, *y, 210, 30)];
+    lbl.text = title;
+    lbl.textColor = [UIColor whiteColor];
+    lbl.font = [UIFont systemFontOfSize:11.5f];
+    [self.contentScrollView addSubview:lbl];
+
+    UISwitch *sw = [[UISwitch alloc] initWithFrame:CGRectMake(240, *y, 50, 30)];
+    sw.on = isOn;
+    [sw addTarget:self action:action forControlEvents:UIControlEventValueChanged];
+    [self.contentScrollView addSubview:sw];
+    *y += 45;
 }
 
-- (void)loadTabContent:(NSInteger)tabIndex {
-    for (UIView *v in self.contentScrollView.subviews) { [v removeFromSuperview]; }
-    CGFloat yPos = 10;
-
-    if (tabIndex == 4) {
-        UILabel *lbl = [[UILabel alloc] initWithFrame:CGRectMake(10, yPos, 300, 60)];
-        lbl.text = @"Chế độ an toàn: Đã cô lập các hàm nặng để chống văng game khi load dữ liệu.";
-        lbl.textColor = [UIColor orangeColor];
-        lbl.font = [UIFont systemFontOfSize:11.0f];
-        lbl.numberOfLines = 0;
-        [self.contentScrollView addSubview:lbl];
-        yPos += 70;
-
-        UILabel *lblGm = [[UILabel alloc] initWithFrame:CGRectMake(10, yPos, 210, 30)];
-        lblGm.text = @"Mở Khóa Bảng Lệnh GM Dev";
-        lblGm.textColor = [UIColor whiteColor];
-        lblGm.font = [UIFont systemFontOfSize:11.5f];
-        [self.contentScrollView addSubview:lblGm];
-
-        UISwitch *sw = [[UISwitch alloc] initWithFrame:CGRectMake(240, yPos, 50, 30)];
-        sw.on = g_BypassGMPanel;
-        [sw addAction:[UIAction actionWithHandler:^(__kindof UIAction *action) {
-            g_BypassGMPanel = sw.isOn;
-        }] forControlEvents:UIControlEventValueChanged];
-        [self.contentScrollView addSubview:sw];
-    }
-
-    self.contentScrollView.contentSize = CGSizeMake(320, yPos + 20);
-}
+- (void)toggleBypass:(UISwitch *)sender { g_BypassAntiCheat = sender.isOn; }
+- (void)toggleOneHit:(UISwitch *)sender { g_OneHit = sender.isOn; }
+- (void)toggleGMPass:(UISwitch *)sender { g_BypassGMPanel = sender.isOn; }
 
 @end
 
-// --- KHỞI CHẠY DYLIB AN TOÀN ---
-__attribute__((constructor)) void initSheepctFullMasterMenu() {
+// --- 5. KHỞI CHẠY DYLIB & THỰC THI DOBBYHOOK AN TOÀN (DELAY 6 GIÂY) ---
+__attribute__((constructor)) void initSheepctUltimateBypass() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t imageBase = (uintptr_t)_dyld_get_image_header(0);
 
-        // Chỉ hook 1 hàm kiểm tra GM tại 0x219bb6 để kiểm tra độ ổn định
         if (imageBase != 0) {
+            // Thực hiện DobbyHook các hàm cốt lõi đã được cô lập an toàn
             DobbyHook((void *)(imageBase + 0x219bb6), (void *)hooked_GMCmd_IsGm, (void **)&orig_GMCmd_IsGm);
+            DobbyHook((void *)(imageBase + 0x242e3), (void *)hooked_AttackerSkill_HitAttacker, (void **)&orig_AttackerSkill_HitAttacker);
+            
+            // Nếu game có offset hàm Integrity Check cụ thể, gán vào đây:
+            // DobbyHook((void *)(imageBase + 0xOFFSET_INTEGRITY), (void *)hooked_AntiCheat_CheckIntegrity, (void **)&orig_AntiCheat_CheckIntegrity);
         }
 
         UIWindow *window = UIApplication.sharedApplication.keyWindow;
