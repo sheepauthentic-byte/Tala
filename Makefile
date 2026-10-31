@@ -1,7 +1,33 @@
 TARGET = libSheepctMod.dylib
 CC = xcrun --sdk iphoneos clang++
-CFLAGS = -std=c++11 -O3 -Wall -fPIC -target arm64-apple-ios -I./Dobby/include
-LDFLAGS = -dynamiclib -install_name @executable_path/libSheepctMod.dylib -framework UIKit -framework Foundation -target arm64-apple-ios
+
+CFLAGS = -std=c++11 -O3 -Wall -fPIC -target arm64-apple-ios \
+         -I./Dobby/include \
+         -I./Dobby/source \
+         -I./Dobby/builtin-plugin
+
+# Đã bổ sung -framework WebKit vào liên kết LDFLAGS
+LDFLAGS = -dynamiclib -install_name @executable_path/libSheepctMod.dylib -framework UIKit -framework Foundation -framework WebKit -target arm64-apple-ios
+
+DOBBY_SOURCES = \
+    Dobby/source/dobby.cpp \
+    Dobby/source/MemoryAllocator/BufferBlobAllocator.cc \
+    Dobby/source/MemoryAllocator/AssemblyCodeBuffer.cc \
+    Dobby/source/InterceptRouting/InterceptRouting.cc \
+    Dobby/source/InterceptRouting/common/function-relocation.cc \
+    Dobby/source/InterceptRouting/common/trampoline-buffer.cc \
+    Dobby/source/InterceptRouting/platform-dependent/intercept_routing_arm64.cc \
+    Dobby/source/InstructionRelocator/InstructionRelocator.cc \
+    Dobby/source/InstructionRelocator/arm64/InstructionRelocator-arm64.cc \
+    Dobby/source/InstructionRelocator/arm64/addr-relocator-arm64.cc \
+    Dobby/source/Backend/ARM64/assembler-arm64.cc \
+    Dobby/source/Backend/ARM64/compiler-arm64.cc \
+    Dobby/source/Backend/ARM64/loader-arm64.cc \
+    Dobby/source/Backend/ARM64/interceptor-arm64.cc \
+    Dobby/source/Portability/addr_util.cc \
+    Dobby/source/Common/logging.cc \
+    Dobby/source/Common/assembly_stream.cc \
+    Dobby/source/Common/cxx_header_check.cc
 
 all: $(TARGET)
 
@@ -9,24 +35,8 @@ build/main.o: main.mm
 	mkdir -p build
 	$(CC) $(CFLAGS) -c main.mm -o build/main.o
 
-# Truyền đầy đủ CMAKE_SYSTEM_PROCESSOR để vượt qua build_environment_check.cmake của Dobby
-Dobby/build/libdobby.a:
-	rm -rf Dobby/build
-	mkdir -p Dobby/build
-	cd Dobby/build && cmake .. \
-		-DCMAKE_SYSTEM_NAME=iOS \
-		-DCMAKE_SYSTEM_PROCESSOR=arm64 \
-		-DCMAKE_APPLE_SILICON_PROCESSOR=arm64 \
-		-DCMAKE_OSX_SYSROOT=iphoneos \
-		-DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
-		-DCMAKE_OSX_ARCHITECTURES=arm64 \
-		-DCMAKE_C_COMPILER="$$(xcrun --sdk iphoneos -find clang)" \
-		-DCMAKE_CXX_COMPILER="$$(xcrun --sdk iphoneos -find clang++)"
-	cd Dobby/build && make -j$$(sysctl -n hw.ncpu)
-
-$(TARGET): build/main.o Dobby/build/libdobby.a
-	$(CC) $(LDFLAGS) build/main.o Dobby/build/libdobby.a -o $(TARGET)
+$(TARGET): build/main.o
+	$(CC) $(LDFLAGS) build/main.o $(DOBBY_SOURCES) -o $(TARGET) $(CFLAGS)
 
 clean:
 	rm -rf build $(TARGET)
-	rm -rf Dobby/build
