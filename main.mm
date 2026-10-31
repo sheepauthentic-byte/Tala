@@ -105,27 +105,26 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 // ==========================================
 // --- 3. GIAO DIỆN CYBER WEBVIEW MOD MENU ---
 // ==========================================
-@interface WebModMenuController : NSObject <WKScriptMessageHandler, WKNavigationDelegate>
+@interface CyberMenuController : NSObject <WKScriptMessageHandler, WKNavigationDelegate>
 @property (nonatomic, strong) UIWindow *menuWindow;
 + (instancetype)sharedInstance;
 - (void)preloadMenu;
 - (void)toggleMenu;
 @end
 
-@implementation WebModMenuController {
+@implementation CyberMenuController {
     WKWebView *webView;
 }
 
 + (instancetype)sharedInstance {
-    static WebModMenuController *shared = nil;
+    static CyberMenuController *shared = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        shared = [[WebModMenuController alloc] init];
+        shared = [[CyberMenuController alloc] init];
     });
     return shared;
 }
 
-// Preload ngầm từ đầu để chống đứng game tuyệt đối khi mở
 - (void)preloadMenu {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.menuWindow) return;
@@ -218,7 +217,6 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
     });
 }
 
-// Bấm vào icon nổi mở/đóng menu tức thì
 - (void)toggleMenu {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.menuWindow) {
@@ -286,12 +284,10 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 
 // --- 5. KHỞI TẠO & KÍCH HOẠT DOBBY HOOK ---
 __attribute__((constructor)) static void init_sheepct_mod() {
-    // 1. Preload menu ngầm khi dylib khởi động
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [[WebModMenuController sharedInstance] preloadMenu];
+        [[CyberMenuController sharedInstance] preloadMenu];
     });
 
-    // 2. Thực hiện Hook và tạo nút nổi khi game đã hoàn toàn ổn định
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(7.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t slide = get_unity_slide();
         if (slide > 0) {
@@ -343,7 +339,7 @@ __attribute__((constructor)) static void init_sheepct_mod() {
         floatingBtn.layer.borderWidth = 1.8f;
         floatingBtn.layer.borderColor = [UIColor colorWithRed:0.34f green:0.9f blue:1.0f alpha:1.0f].CGColor;
 
-        [floatingBtn addTarget:[WebModMenuController sharedInstance] action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
+        [floatingBtn addTarget:[CyberMenuController sharedInstance] action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
         [targetWindow addSubview:floatingBtn];
         [targetWindow bringSubviewToFront:floatingBtn];
     });
