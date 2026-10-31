@@ -1,4 +1,4 @@
-name: Compile iOS Dylib (Sheepct Makefile)
+name: Build iOS Dylib
 
 on:
   push:
@@ -8,23 +8,21 @@ on:
 
 jobs:
   build:
-    # QUAN TRỌNG: Phải dùng macos-latest để có sẵn Apple SDK (UIKit, Foundation)
     runs-on: macos-latest
-
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    - name: Compile Dynamic Library with Makefile
-      run: |
-        make clean
-        make
+      - name: Clone Dobby Dependency
+        run: git clone --depth=1 https://github.com/jmpews/Dobby.git Dobby
 
-    - name: Upload Artifact (.dylib)
-      uses: actions/upload-artifact@v4
-      with:
-        name: SheepctMod-Dylib
-        path: libSheepctMod.dylib
-            - name: Clone Dobby Dependency
-      run: git clone --depth=1 https://github.com/jmpews/Dobby.git Dobby
+      - name: Build Dylib
+        run: |
+          make clean
+          make
 
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: libSheepctMod.dylib
+          path: libSheepctMod.dylib
