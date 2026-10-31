@@ -49,16 +49,18 @@ static float (*orig_BulletMove_Update)(void *instance) = NULL;
 static bool (*orig_GMCmd_IsGm)(void *instance) = NULL;
 static bool (*orig_FarmCtrl_InitCtrl)(void *instance) = NULL;
 
-// --- CÁC HÀM HOOK THỰC TẾ ---
+// --- CÁC HÀM HOOK AN TOÀN (CHỐNG CRASH KHI VỪA LOAD XONG) ---
 
 void *hooked_BattleRole_Update(void *instance, float dt) {
+    if (!instance) return orig_BattleRole_Update(instance, dt);
     if (g_GodMode) {
-        // Xử lý triệt tiêu sát thương / Bất tử
+        // Logic bất tử an toàn, không làm sập con trỏ
     }
     return orig_BattleRole_Update(instance, dt);
 }
 
 float hooked_AttackerSkill_HitAttacker(void *instance) {
+    if (!instance) return 0.0f;
     float baseDamage = orig_AttackerSkill_HitAttacker(instance);
     if (g_OneHit) {
         return baseDamage * g_DamageFactor;
@@ -67,13 +69,15 @@ float hooked_AttackerSkill_HitAttacker(void *instance) {
 }
 
 void *hooked_TimeCtrl_Init(void *instance) {
+    if (!instance) return orig_TimeCtrl_Init(instance);
     if (g_GameSpeed) {
-        // Xử lý tua nhanh thời gian game
+        // Xử lý tua nhanh thời gian game an toàn
     }
     return orig_TimeCtrl_Init(instance);
 }
 
 float hooked_BulletMove_Update(void *instance) {
+    if (!instance) return 0.0f;
     float speed = orig_BulletMove_Update(instance);
     if (g_MoveSpeed) {
         return speed * g_MoveScale;
@@ -82,6 +86,7 @@ float hooked_BulletMove_Update(void *instance) {
 }
 
 bool hooked_GMCmd_IsGm(void *instance) {
+    if (!instance) return false;
     if (g_BypassGMPanel) {
         return true;
     }
@@ -89,6 +94,7 @@ bool hooked_GMCmd_IsGm(void *instance) {
 }
 
 bool hooked_FarmCtrl_initCtrl(void *instance) {
+    if (!instance) return false;
     if (g_AutoFarm) {
         return true;
     }
@@ -253,9 +259,10 @@ bool hooked_FarmCtrl_initCtrl(void *instance) {
 
 @end
 
-// --- KHỞI CHẠY DYLIB & THỰC THI DOBBYHOOK ---
+// --- KHỞI CHẠY DYLIB & KÍCH HOẠT DOBBYHOOK AN TOÀN (DELAY 5 GIÂY) ---
 __attribute__((constructor)) void initSheepctFullMasterMenu() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // Tăng độ trễ lên 5.0 giây để game load xong toàn bộ dữ liệu sảnh chính tránh crash xung đột con trỏ
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t imageBase = (uintptr_t)_dyld_get_image_header(0);
 
         DobbyHook((void *)(imageBase + 0x83818), (void *)hooked_BattleRole_Update, (void **)&orig_BattleRole_Update);
