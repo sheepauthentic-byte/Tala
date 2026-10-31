@@ -16,9 +16,7 @@ jobs:
       - name: Clone Dobby with Submodules
         run: |
           rm -rf Dobby
-          git clone https://github.com/jmpews/Dobby.git Dobby
-          cd Dobby
-          git submodule update --init --recursive
+          git clone --depth=1 --recurse-submodules https://github.com/jmpews/Dobby.git Dobby
 
       - name: Build Dylib
         run: |
