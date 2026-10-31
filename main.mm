@@ -243,7 +243,7 @@ bool hooked_FarmCtrl_InitCtrl(void *instance) {
 - (void)sliderGameSpeed:(UISlider *)sender { g_SpeedFactor = sender.value; }
 - (void)toggle120FPS:(UISwitch *)sender {
     g_Unlock120FPS = sender.isOn;
-    if (g_Unlock120FPS) { UIScreen.mainScreen.maximumFramesPerSecond = 120; }
+    if (g_Unlock120FPS) { /* UIScreen.maximumFramesPerSecond is readonly: cannot be set here. */ }
 }
 
 - (void)toggleAllSkins:(UISwitch *)sender { g_AllSkins = sender.isOn; }
@@ -283,10 +283,7 @@ __attribute__((constructor)) void initSheepctFullMasterMenu() {
         floatBtn.layer.cornerRadius = 22.5f;
         [floatBtn setTitle:@"S" forState:UIControlStateNormal];
         [floatBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        [floatBtn addTarget:^int(UIButton *b){
-            menu.hidden = !menu.hidden;
-            return 0;
-        }(floatBtn) forControlEvents:UIControlEventTouchUpInside];
+        [floatBtn addAction:[UIAction actionWithHandler:^(__kindof UIAction *action) { menu.hidden = !menu.hidden; }] forControlEvents:UIControlEventTouchUpInside];
         [window addSubview:floatBtn];
     });
 }
