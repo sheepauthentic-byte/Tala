@@ -209,7 +209,8 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
     });
 }
 
-- (void)userContentController:(WKScriptMessageHandler *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
+// Sửa lại đúng chuẩn WKUserContentController theo yêu cầu của WKScriptMessageHandler
+- (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
     if ([message.name isEqualToString:@"modCallback"]) {
         NSDictionary *dict = message.body;
         NSString *action = dict[@"action"];
