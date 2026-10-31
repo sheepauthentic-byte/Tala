@@ -170,7 +170,6 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
         ".switch{width:42px;height:24px;border-radius:20px;border:0;background:#414149;padding:2px;cursor:pointer;flex:none}"
         ".switch:after{content:\"\";display:block;width:20px;height:20px;border-radius:50%;background:#aaa;transition:.18s}"
         ".switch.on{background:var(--red)}.switch.on:after{transform:translateX(18px);background:white}"
-        ".action{width:100%;margin-top:8px;padding:10px;border:1px solid #41414b;border-radius:12px;background:#121216;color:#f3f3f5;font-size:13px;font-weight:700;text-align:left;cursor:pointer}"
         ".sliderbox{padding:10px 2px 2px}"
         ".sliderhead{display:flex;justify-content:space-between;font-size:12px;font-weight:650}"
         ".sliderhead span:last-child{color:#fff}"
@@ -181,15 +180,15 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
         ".foot{text-align:center;color:#66d9ec;font-size:10px;font-weight:700;padding:6px;letter-spacing:.3px}"
         "</style></head><body>"
         "<div class=\"panel\">"
-        "<header class=\"top\"><div class=\"logo\">C✦</div><div><div class=\"brand\">CYBER CONTROL</div><div class=\"sub\">Tool do TRẦN MẠNH CƯỜNG</div></div><div class=\"spacer\"></div><button class=\"topbtn hot\" onclick=\"closeMenu()\">✕ ĐÓNG</button></header>"
+        "<header class=\"top\"><div class=\"logo\">C✦</div><div><div class=\"brand\">CYBER CONTROL</div><div class=\"sub\">TRẦN MẠNH CƯỜNG</div></div><div class=\"spacer\"></div><button class=\"topbtn hot\" onclick=\"closeMenu()\">✕ ĐÓNG</button></header>"
         "<main class=\"main\">"
         "<section class=\"card\"><h2><span class=\"accent\">◉</span>TÙY CHỈNH MOD</h2>"
-        "<div class=\"row\"><span class=\"ico\">✧</span><div class=\"text\"><div class=\"label\">1. Kháng sát thương (God Mode)</div><div class=\"hint\">Bật tắt bất tử</div></div><button class=\"switch\" id=\"sw-godmode\" onclick=\"toggleMod('godmode')\"></button></div>"
-        "<div class=\"row\"><span class=\"ico\">▦</span><div class=\"text\"><div class=\"label\">2. Tốc độ di chuyển</div><div class=\"hint\">Tăng tốc chạy</div></div><button class=\"switch\" id=\"sw-speed\" onclick=\"toggleMod('speed')\"></button></div>"
+        "<div class=\"row\"><span class=\"ico\">✧</span><div class=\"text\"><div class=\"label\">1. Kháng sát thương</div><div class=\"hint\">God Mode</div></div><button class=\"switch\" id=\"sw-godmode\" onclick=\"toggleMod('godmode')\"></button></div>"
+        "<div class=\"row\"><span class=\"ico\">▦</span><div class=\"text\"><div class=\"label\">2. Tốc độ di chuyển</div><div class=\"hint\">Speed Hack</div></div><button class=\"switch\" id=\"sw-speed\" onclick=\"toggleMod('speed')\"></button></div>"
         "<div class=\"sliderbox\"><div class=\"sliderhead\"><span>Hệ số Tốc độ</span><span id=\"val-speed\">1.0x</span></div><input class=\"range\" type=\"range\" min=\"1\" max=\"10\" step=\"0.5\" value=\"1\" oninput=\"updateSlider('speed', this.value)\"></div>"
         "</section>"
         "<section class=\"card\"><h2><span class=\"accent\">⌁</span>HỆ THỐNG & GAME</h2>"
-        "<div class=\"row\"><span class=\"ico\">◉</span><div class=\"text\"><div class=\"label\">3. Khinh công / Nhảy cao</div><div class=\"hint\">Tăng độ cao khi nhảy</div></div><button class=\"switch\" id=\"sw-jump\" onclick=\"toggleMod('jump')\"></button></div>"
+        "<div class=\"row\"><span class=\"ico\">◉</span><div class=\"text\"><div class=\"label\">3. Khinh công / Nhảy cao</div><div class=\"hint\">High Jump</div></div><button class=\"switch\" id=\"sw-jump\" onclick=\"toggleMod('jump')\"></button></div>"
         "<div class=\"sliderbox\"><div class=\"sliderhead\"><span>Tốc độ Game</span><span id=\"val-gamespeed\">1.0x</span></div><input class=\"range\" type=\"range\" min=\"1\" max=\"10\" step=\"0.5\" value=\"1\" oninput=\"updateSlider('gamespeed', this.value)\"></div>"
         "</section>"
         "</main>"
@@ -219,7 +218,7 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
     });
 }
 
-// Bấm vào icon nổi mở/đóng menu tức thì (siêu mượt)
+// Bấm vào icon nổi mở/đóng menu tức thì
 - (void)toggleMenu {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (self.menuWindow) {
@@ -287,13 +286,13 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 
 // --- 5. KHỞI TẠO & KÍCH HOẠT DOBBY HOOK ---
 __attribute__((constructor)) static void init_sheepct_mod() {
-    // 1. Preload menu ngầm ngay khi dylib khởi động
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // 1. Preload menu ngầm khi dylib khởi động
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [[WebModMenuController sharedInstance] preloadMenu];
     });
 
-    // 2. Thực hiện Hook và tạo nút nổi khi game ổn định
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // 2. Thực hiện Hook và tạo nút nổi khi game đã hoàn toàn ổn định
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(7.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t slide = get_unity_slide();
         if (slide > 0) {
             DobbyHook((void *)(slide + 0x33561BC), (void *)&hook_ActorController_PlayHurt, (void **)&orig_ActorController_PlayHurt);
