@@ -35,14 +35,12 @@ static uintptr_t get_unity_slide() {
 // --- 2. HỆ THỐNG HOOK THẬT CHO TỪNG HÀM ---
 // ==========================================
 
-// 1. PlayHurt (God Mode)
 static void (*orig_ActorController_PlayHurt)(void *self, void *ppd, void *cb);
 static void hook_ActorController_PlayHurt(void *self, void *ppd, void *cb) {
     if (g_enableGodMode) return;
     orig_ActorController_PlayHurt(self, ppd, cb);
 }
 
-// 2. FixedUpdate (Speed & Jump)
 static void (*orig_ActorQingGong_FixedUpdate)(void *self);
 static void hook_ActorQingGong_FixedUpdate(void *self) {
     if (self) {
@@ -59,7 +57,6 @@ static void hook_ActorQingGong_FixedUpdate(void *self) {
     orig_ActorQingGong_FixedUpdate(self);
 }
 
-// 3. Game Speed Hack (Time.set_timeScale)
 static void (*orig_Time_set_timeScale)(float value);
 static void hook_Time_set_timeScale(float value) {
     if (g_enableGameSpeed) {
@@ -106,11 +103,12 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 }
 
 // ==========================================
-// --- 3. GIAO DIỆN WEBVIEW MOD MENU ---
+// --- 3. GIAO DIỆN WEBVIEW MOD MENU (PRELOAD NGẦM) ---
 // ==========================================
 @interface WebModMenuController : NSObject <WKScriptMessageHandler, WKNavigationDelegate>
 @property (nonatomic, strong) UIWindow *menuWindow;
 + (instancetype)sharedInstance;
+- (void)preloadMenu;
 - (void)toggleMenu;
 @end
 
@@ -127,12 +125,10 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
     return shared;
 }
 
-- (void)toggleMenu {
+// Khởi tạo và load sẵn WebView ngầm từ đầu để chống đứng game tuyệt đối
+- (void)preloadMenu {
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (self.menuWindow) {
-            self.menuWindow.hidden = !self.menuWindow.hidden;
-            return;
-        }
+        if (self.menuWindow) return;
 
         self.menuWindow = [[UIWindow alloc] initWithFrame:CGRectMake(20, 60, 345, 450)];
         self.menuWindow.windowLevel = UIWindowLevelStatusBar + 200;
@@ -159,7 +155,7 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
         "<title>Sheepct Mod Menu</title>"
         "<style>"
         "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, sans-serif; color: #ffffff; user-select: none; -webkit-user-select: none; }"
-        ".menu-container { position: absolute; top: 0; left: 0; width: 345px; height: 450px; background: rgba(15, 15, 25, 0.95); border: 1.5px solid rgba(0, 200, 255, 0.8); border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7); overflow: hidden; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }"
+        ".menu-container { position: absolute; top: 0; left: 0; width: 345px; height: 450px; background: rgba(15, 15, 25, 0.96); border: 1.5px solid rgba(0, 200, 255, 0.8); border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7); overflow: hidden; }"
         ".header { padding: 12px; background: linear-gradient(90deg, rgba(0,100,200,0.5), rgba(0,200,255,0.2)); text-align: center; font-weight: bold; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.1); }"
         ".author { font-size: 10px; color: #00e5ff; margin-top: 2px; }"
         ".content { padding: 12px; height: 330px; overflow-y: auto; }"
@@ -205,11 +201,21 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 
         [webView loadHTMLString:htmlContent baseURL:nil];
         [vc.view addSubview:webView];
-        self.menuWindow.hidden = NO;
+        
+        // Ẩn sẵn cửa sổ ngay sau khi load ngầm xong
+        self.menuWindow.hidden = YES;
     });
 }
 
-// Sửa lại đúng chuẩn WKUserContentController theo yêu cầu của WKScriptMessageHandler
+// Bấm vào icon nổi chỉ bật/tắt hiển thị cửa sổ (Siêu nhanh, không lag)
+- (void)toggleMenu {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (self.menuWindow) {
+            self.menuWindow.hidden = !self.menuWindow.hidden;
+        }
+    });
+}
+
 - (void)userContentController:(WKUserContentController *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
     if ([message.name isEqualToString:@"modCallback"]) {
         NSDictionary *dict = message.body;
@@ -233,7 +239,7 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 
 @end
 
-// --- NÚT NỔI KÉO THẢ ---
+// --- 4. NÚT NỔI KÉO THẢ ---
 @interface DraggableButton : UIButton
 @end
 
@@ -266,9 +272,15 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 }
 @end
 
-// --- KHỞI TẠO & KÍCH HOẠT DOBBY HOOK ---
+// --- 5. KHỞI TẠO & KÍCH HOẠT DOBBY HOOK ---
 __attribute__((constructor)) static void init_sheepct_mod() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // 1. Preload menu ngầm ngay khi dylib vừa khởi động
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [[WebModMenuController sharedInstance] preloadMenu];
+    });
+
+    // 2. Thực hiện Hook và tạo nút nổi khi game đã ổn định
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t slide = get_unity_slide();
         if (slide > 0) {
             DobbyHook((void *)(slide + 0x33561BC), (void *)&hook_ActorController_PlayHurt, (void **)&orig_ActorController_PlayHurt);
