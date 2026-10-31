@@ -1,6 +1,9 @@
 TARGET = libSheepctMod.dylib
-CC = clang
-CXX = clang++
+
+# Sử dụng xcrun để trỏ trực tiếp vào iPhoneOS SDK của Xcode
+SDK = iphoneos
+CC = xcrun --sdk $(SDK) clang
+CXX = xcrun --sdk $(SDK) clang++
 
 SRC_DIR = .
 BUILD_DIR = build
@@ -11,10 +14,10 @@ OBJECTS = $(patsubst $(SRC_DIR)/%.m, $(BUILD_DIR)/%.o, \
           $(patsubst $(SRC_DIR)/%.cpp, $(BUILD_DIR)/%.o, \
           $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SOURCES)))))
 
-CFLAGS = -fobjc-arc -O3 -Wall -fPIC
-CXXFLAGS = -std=c++11 -O3 -Wall -fPIC
+# Bắt buộc phải có -target arm64-apple-ios để nhận diện UIKit của iOS
+CFLAGS = -fobjc-arc -O3 -Wall -fPIC -target arm64-apple-ios
+CXXFLAGS = -std=c++11 -O3 -Wall -fPIC -target arm64-apple-ios
 
-# Liên kết đầy đủ các framework giao diện cốt lõi của iOS
 LDFLAGS = -dynamiclib -undefined dynamic_lookup \
           -framework Foundation \
           -framework UIKit \
@@ -40,7 +43,7 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 
 $(TARGET): $(OBJECTS)
 	$(CXX) $(LDFLAGS) -o $@ $^
-	@echo "Bien dịch thành công: $(TARGET)"
+	@echo "Bien dịch thanh cong cho iOS: $(TARGET)"
 
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
