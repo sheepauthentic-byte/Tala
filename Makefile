@@ -21,10 +21,14 @@ CC := xcrun --sdk iphoneos clang++
 IPHONEOS_MIN := 14.0
 ARCH := arm64
 
+# 2026-10-31: main.mm dung _dyld_get_image_header() nhung khong #include
+# <mach-o/dyld.h>; Makefile khong sua main.mm nen dung -include de nap
+# header nay cho moi lan bien dich main.mm (chi sua phia Makefile).
 MAIN_CXXFLAGS := -std=c++17 -O3 -Wall -fPIC -fobjc-arc \
 	-arch $(ARCH) -miphoneos-version-min=$(IPHONEOS_MIN) \
 	-isysroot $(SDK_PATH) \
-	-I./Dobby/include
+	-I./Dobby/include \
+	-include <mach-o/dyld.h>
 
 MAIN_LDFLAGS := -dynamiclib \
 	-arch $(ARCH) -miphoneos-version-min=$(IPHONEOS_MIN) \
