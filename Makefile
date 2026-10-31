@@ -1,7 +1,6 @@
 TARGET = libSheepctMod.dylib
 CC = xcrun --sdk iphoneos clang++
 
-# Gom toàn bộ đường dẫn bao gồm cả source và thư viện con của Dobby
 CFLAGS = -std=c++11 -O3 -Wall -fPIC -target arm64-apple-ios \
          -I./Dobby/include \
          -I./Dobby/source \
@@ -21,7 +20,6 @@ CFLAGS = -std=c++11 -O3 -Wall -fPIC -target arm64-apple-ios \
 
 LDFLAGS = -dynamiclib -install_name @executable_path/libSheepctMod.dylib -framework UIKit -framework Foundation -target arm64-apple-ios
 
-# Tự động tìm tất cả file mã nguồn trong Dobby
 DOBBY_SOURCES = $(shell find Dobby/source Dobby/builtin-plugin -name "*.cpp" -o -name "*.c" -o -name "*.cc")
 
 all: $(TARGET)
