@@ -1,18 +1,20 @@
 #import <UIKit/UIKit.h>
+#import <WebKit/WebKit.h>
 #include <mach-o/dyld.h>
 #include <dlfcn.h>
 #include "dobby.h"
 
-static bool g_enableGodMode = false;
-static bool g_enableSpeedHack = false;
-static bool g_enableHighJump = false;
-static bool g_enableGameSpeed = false;
-static bool g_enableNoCameraShake = false;
-static bool g_enableNoHalt = false;
-static bool g_enableFootsteps = false;
-static bool g_enableSceneFade = false;
-static bool g_enableBlink = false;
-static bool g_enableForceLanding = false;
+// --- 1. BIẾN TRẠNG THÁI TOÀN CỤC ---
+static bool g_enableGodMode = false;          // 1. Kháng sát thương
+static bool g_enableSpeedHack = false;        // 2. Tốc độ di chuyển
+static bool g_enableHighJump = false;         // 3. Nhảy cao / Khinh công
+static bool g_enableGameSpeed = false;        // 4. Tăng tốc độ toàn cục game
+static bool g_enableNoCameraShake = false;    // 5. Tắt rung màn hình
+static bool g_enableNoHalt = false;           // 6. Chống khựng chuyển động
+static bool g_enableFootsteps = false;        // 7. Âm thanh bước chân
+static bool g_enableSceneFade = false;        // 8. Hiệu ứng chuyển cảnh
+static bool g_enableBlink = false;            // 9. Chớp sáng nhân vật
+static bool g_enableForceLanding = false;     // 10. Ép hạ cánh tức thì
 
 static float g_speedMultiplier = 1.0f;        
 static float g_jumpMultiplier = 1.0f;         
@@ -29,12 +31,18 @@ static uintptr_t get_unity_slide() {
     return (uintptr_t)_dyld_get_image_vmaddr_slide(0);
 }
 
+// ==========================================
+// --- 2. HỆ THỐNG HOOK THẬT CHO TỪNG HÀM ---
+// ==========================================
+
+// 1. PlayHurt (God Mode)
 static void (*orig_ActorController_PlayHurt)(void *self, void *ppd, void *cb);
 static void hook_ActorController_PlayHurt(void *self, void *ppd, void *cb) {
     if (g_enableGodMode) return;
     orig_ActorController_PlayHurt(self, ppd, cb);
 }
 
+// 2. FixedUpdate (Speed & Jump)
 static void (*orig_ActorQingGong_FixedUpdate)(void *self);
 static void hook_ActorQingGong_FixedUpdate(void *self) {
     if (self) {
@@ -51,6 +59,7 @@ static void hook_ActorQingGong_FixedUpdate(void *self) {
     orig_ActorQingGong_FixedUpdate(self);
 }
 
+// 3. Game Speed Hack (Time.set_timeScale)
 static void (*orig_Time_set_timeScale)(float value);
 static void hook_Time_set_timeScale(float value) {
     if (g_enableGameSpeed) {
@@ -96,228 +105,134 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
     orig_ActorQingGong_ForceLanding(self);
 }
 
-@interface SheepctModMenuController : NSObject
+// ==========================================
+// --- 3. GIAO DIỆN WEBVIEW MOD MENU ---
+// ==========================================
+@interface WebModMenuController : NSObject <WKScriptMessageHandler, WKNavigationDelegate>
 @property (nonatomic, strong) UIWindow *menuWindow;
 + (instancetype)sharedInstance;
 - (void)toggleMenu;
 @end
 
-@implementation SheepctModMenuController {
-    UIView *mainView;
-    UIScrollView *contentScroll;
-    UILabel *speedValLabel;
-    UILabel *jumpValLabel;
-    UILabel *gameSpeedValLabel;
-    int currentTab;
-    NSMutableArray *tabButtons;
+@implementation WebModMenuController {
+    WKWebView *webView;
 }
 
 + (instancetype)sharedInstance {
-    static SheepctModMenuController *shared = nil;
+    static WebModMenuController *shared = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        shared = [[SheepctModMenuController alloc] init];
-        shared->currentTab = 0;
-        shared->tabButtons = [NSMutableArray array];
+        shared = [[WebModMenuController alloc] init];
     });
     return shared;
 }
 
 - (void)toggleMenu {
-    if (self.menuWindow) {
-        self.menuWindow.hidden = !self.menuWindow.hidden;
-        return;
-    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (self.menuWindow) {
+            self.menuWindow.hidden = !self.menuWindow.hidden;
+            return;
+        }
 
-    self.menuWindow = [[UIWindow alloc] initWithFrame:CGRectMake(30, 80, 340, 480)];
-    self.menuWindow.windowLevel = UIWindowLevelAlert + 1;
-    self.menuWindow.backgroundColor = [UIColor clearColor];
+        self.menuWindow = [[UIWindow alloc] initWithFrame:CGRectMake(20, 60, 345, 450)];
+        self.menuWindow.windowLevel = UIWindowLevelStatusBar + 200;
+        self.menuWindow.backgroundColor = [UIColor clearColor];
 
-    UIViewController *vc = [[UIViewController alloc] init];
-    self.menuWindow.rootViewController = vc;
+        UIViewController *vc = [[UIViewController alloc] init];
+        vc.view.backgroundColor = [UIColor clearColor];
+        self.menuWindow.rootViewController = vc;
 
-    mainView = [[UIView alloc] initWithFrame:vc.view.bounds];
-    mainView.backgroundColor = [UIColor colorWithRed:0.06f green:0.06f blue:0.09f alpha:0.95f];
-    mainView.layer.cornerRadius = 18.0f;
-    mainView.layer.borderWidth = 1.5f;
-    mainView.layer.borderColor = [UIColor colorWithRed:0.0f green:0.8f blue:1.0f alpha:0.8f].CGColor;
-    [vc.view addSubview:mainView];
+        WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
+        [config.userContentController addScriptMessageHandler:self name:@"modCallback"];
 
-    UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(12, 12, 316, 22)];
-    titleLabel.text = @"👑 Sheepct Mod - Full Hook & Speed";
-    titleLabel.textColor = [UIColor whiteColor];
-    titleLabel.font = [UIFont boldSystemFontOfSize:13];
-    titleLabel.textAlignment = NSTextAlignmentCenter;
-    [mainView addSubview:titleLabel];
+        webView = [[WKWebView alloc] initWithFrame:vc.view.bounds configuration:config];
+        webView.backgroundColor = [UIColor clearColor];
+        webView.scrollView.backgroundColor = [UIColor clearColor];
+        webView.opaque = NO;
 
-    UILabel *authorLabel = [[UILabel alloc] initWithFrame:CGRectMake(12, 34, 316, 16)];
-    authorLabel.text = @"Tool do TRẦN MẠNH CƯỜNG phát triển";
-    authorLabel.textColor = [UIColor colorWithRed:0.0f green:0.8f blue:1.0f alpha:1.0f];
-    authorLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
-    authorLabel.textAlignment = NSTextAlignmentCenter;
-    [mainView addSubview:authorLabel];
+        NSString *htmlContent = @
+        "<!DOCTYPE html>"
+        "<html lang=\"vi\">"
+        "<head>"
+        "<meta charset=\"UTF-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">"
+        "<title>Sheepct Mod Menu</title>"
+        "<style>"
+        "body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, sans-serif; color: #ffffff; user-select: none; -webkit-user-select: none; }"
+        ".menu-container { position: absolute; top: 0; left: 0; width: 345px; height: 450px; background: rgba(15, 15, 25, 0.95); border: 1.5px solid rgba(0, 200, 255, 0.8); border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7); overflow: hidden; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }"
+        ".header { padding: 12px; background: linear-gradient(90deg, rgba(0,100,200,0.5), rgba(0,200,255,0.2)); text-align: center; font-weight: bold; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.1); }"
+        ".author { font-size: 10px; color: #00e5ff; margin-top: 2px; }"
+        ".content { padding: 12px; height: 330px; overflow-y: auto; }"
+        ".btn-toggle { width: 100%; padding: 10px; margin-bottom: 8px; background: rgba(30, 30, 45, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #fff; font-weight: bold; font-size: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }"
+        ".btn-toggle.active { background: rgba(20, 80, 40, 0.9); border-color: rgba(50, 255, 100, 0.6); color: #5eff7d; }"
+        ".slider-group { margin-bottom: 12px; background: rgba(25, 25, 40, 0.6); padding: 8px; border-radius: 8px; }"
+        ".slider-label { font-size: 11px; margin-bottom: 4px; display: flex; justify-content: space-between; color: #ffcc00; }"
+        "input[type=range] { width: 100%; accent-color: #00e5ff; }"
+        ".footer { position: absolute; bottom: 0; width: 100%; padding: 8px 0; text-align: center; background: rgba(10, 10, 15, 0.9); border-top: 1px solid rgba(255,255,255,0.1); }"
+        ".btn-close { background: rgba(200, 50, 50, 0.8); color: white; border: none; padding: 6px 16px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; }"
+        "</style>"
+        "</head>"
+        "<body>"
+        "<div class=\"menu-container\">"
+        "<div class=\"header\">👑 Sheepct Mod Menu<div class=\"author\">Tool do TRẦN MẠNH CƯỜNG phát triển</div></div>"
+        "<div class=\"content\">"
+        "<button class=\"btn-toggle\" id=\"godmode\" onclick=\"toggleMod('godmode')\"><span>1. Kháng sát thương (God Mode)</span><span id=\"txt-godmode\">[ TẮT ]</span></button>"
+        "<button class=\"btn-toggle\" id=\"speed\" onclick=\"toggleMod('speed')\"><span>2. Tốc độ di chuyển</span><span id=\"txt-speed\">[ TẮT ]</span></button>"
+        "<div class=\"slider-group\"><div class=\"slider-label\"><span>Hệ số Tốc độ</span><span id=\"val-speed\">1.0x</span></div><input type=\"range\" min=\"1\" max=\"10\" step=\"0.5\" value=\"1\" oninput=\"updateSlider('speed', this.value)\"></div>"
+        "<button class=\"btn-toggle\" id=\"jump\" onclick=\"toggleMod('jump')\"><span>3. Khinh công / Nhảy cao</span><span id=\"txt-jump\">[ TẮT ]</span></button>"
+        "<button class=\"btn-toggle\" id=\"gamespeed\" onclick=\"toggleMod('gamespeed')\"><span>4. Tăng tốc độ Game</span><span id=\"txt-gamespeed\">[ TẮT ]</span></button>"
+        "</div>"
+        "<div class=\"footer\"><button class=\"btn-close\" onclick=\"closeMenu()\">Ẩn Menu</button></div>"
+        "</div>"
+        "<script>"
+        "let states = { godmode: false, speed: false, jump: false, gamespeed: false };"
+        "function toggleMod(key) {"
+        "  states[key] = !states[key];"
+        "  let btn = document.getElementById(key);"
+        "  let txt = document.getElementById('txt-' + key);"
+        "  if (states[key]) { btn.classList.add('active'); txt.innerText = '[ BẬT ]'; } "
+        "  else { btn.classList.remove('active'); txt.innerText = '[ TẮT ]'; }"
+        "  window.webkit.messageHandlers.modCallback.postMessage({action: key, state: states[key]});"
+        "}"
+        "function updateSlider(key, val) {"
+        "  document.getElementById('val-' + key).innerText = val + 'x';"
+        "  window.webkit.messageHandlers.modCallback.postMessage({action: key + '_slider', value: val});"
+        "}"
+        "function closeMenu() { window.webkit.messageHandlers.modCallback.postMessage({action: 'close'}); }"
+        "</script>"
+        "</body>"
+        "</html>";
 
-    NSArray *tabs = @[@"Chiến đấu", @"Di chuyển", @"Hệ thống"];
-    CGFloat tabWidth = 316.0f / tabs.count;
-    [tabButtons removeAllObjects];
-    
-    for (int i = 0; i < tabs.count; i++) {
-        UIButton *tabBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-        tabBtn.frame = CGRectMake(12 + i * tabWidth, 58, tabWidth - 4, 30);
-        [tabBtn setTitle:tabs[i] forState:UIControlStateNormal];
-        tabBtn.tag = i;
-        tabBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
-        [tabBtn addTarget:self action:@selector(switchTab:) forControlEvents:UIControlEventTouchUpInside];
-        tabBtn.layer.cornerRadius = 8.0f;
-        [mainView addSubview:tabBtn];
-        [tabButtons addObject:tabBtn];
-    }
-
-    contentScroll = [[UIScrollView alloc] initWithFrame:CGRectMake(12, 98, 316, 330)];
-    contentScroll.backgroundColor = [UIColor clearColor];
-    contentScroll.showsVerticalScrollIndicator = YES;
-    [mainView addSubview:contentScroll];
-
-    [self updateTabStyles];
-    [self reloadTabContent];
-
-    UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    closeBtn.frame = CGRectMake(95, 436, 150, 32);
-    [closeBtn setTitle:@"Ẩn Menu Nhanh" forState:UIControlStateNormal];
-    [closeBtn setTitleColor:[UIColor colorWithRed:1.0f green:0.3f blue:0.3f alpha:1.0f] forState:UIControlStateNormal];
-    closeBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightBold];
-    closeBtn.backgroundColor = [UIColor colorWithRed:0.15f green:0.08f blue:0.08f alpha:0.8f];
-    closeBtn.layer.cornerRadius = 8.0f;
-    [closeBtn addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
-    [mainView addSubview:closeBtn];
-
-    self.menuWindow.hidden = NO;
+        [webView loadHTMLString:htmlContent baseURL:nil];
+        [vc.view addSubview:webView];
+        self.menuWindow.hidden = NO;
+    });
 }
 
-- (void)switchTab:(UIButton *)sender {
-    currentTab = (int)sender.tag;
-    [self updateTabStyles];
-    [self reloadTabContent];
-}
-
-- (void)updateTabStyles {
-    for (int i = 0; i < tabButtons.count; i++) {
-        UIButton *btn = tabButtons[i];
-        if (i == currentTab) {
-            btn.backgroundColor = [UIColor colorWithRed:0.0f green:0.5f blue:0.8f alpha:1.0f];
-            [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        } else {
-            btn.backgroundColor = [UIColor colorWithRed:0.12f green:0.12f blue:0.18f alpha:1.0f];
-            [btn setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
+- (void)userContentController:(WKScriptMessageHandler *)userContentController didReceiveScriptMessage:(WKScriptMessage *)message {
+    if ([message.name isEqualToString:@"modCallback"]) {
+        NSDictionary *dict = message.body;
+        NSString *action = dict[@"action"];
+        
+        if ([action isEqualToString:@"close"]) {
+            [self toggleMenu];
+        } else if ([action isEqualToString:@"godmode"]) {
+            g_enableGodMode = [dict[@"state"] boolValue];
+        } else if ([action isEqualToString:@"speed"]) {
+            g_enableSpeedHack = [dict[@"state"] boolValue];
+        } else if ([action isEqualToString:@"jump"]) {
+            g_enableHighJump = [dict[@"state"] boolValue];
+        } else if ([action isEqualToString:@"gamespeed"]) {
+            g_enableGameSpeed = [dict[@"state"] boolValue];
+        } else if ([action isEqualToString:@"speed_slider"]) {
+            g_speedMultiplier = [dict[@"value"] floatValue];
         }
     }
 }
 
-- (void)reloadTabContent {
-    for (UIView *sub in contentScroll.subviews) {
-        [sub removeFromSuperview];
-    }
-
-    CGFloat yOffset = 10;
-    
-    if (currentTab == 0) {
-        [self addToggleButton:CGRectMake(0, yOffset, 316, 36) title:@"1. Kháng sát thương (God Mode)" state:g_enableGodMode action:@selector(toggleGodMode:)]; yOffset += 44;
-        contentScroll.contentSize = CGSizeMake(316, yOffset + 10);
-
-    } else if (currentTab == 1) {
-        [self addToggleButton:CGRectMake(0, yOffset, 316, 36) title:@"2. Tốc độ di chuyển (Speed)" state:g_enableSpeedHack action:@selector(toggleSpeedHack:)]; yOffset += 40;
-        
-        speedValLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, yOffset, 316, 18)];
-        speedValLabel.text = [NSString stringWithFormat:@"Hệ số Tốc độ: %.1fx", g_speedMultiplier];
-        speedValLabel.textColor = [UIColor colorWithRed:1.0f green:0.8f blue:0.0f alpha:1.0f];
-        speedValLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-        speedValLabel.textAlignment = NSTextAlignmentCenter;
-        [contentScroll addSubview:speedValLabel]; yOffset += 22;
-
-        UISlider *speedSlider = [[UISlider alloc] initWithFrame:CGRectMake(10, yOffset, 296, 25)];
-        speedSlider.minimumValue = 1.0f; speedSlider.maximumValue = 10.0f; speedSlider.value = g_speedMultiplier;
-        [speedSlider addTarget:self action:@selector(speedChanged:) forControlEvents:UIControlEventValueChanged];
-        [contentScroll addSubview:speedSlider]; yOffset += 35;
-
-        [self addToggleButton:CGRectMake(0, yOffset, 316, 36) title:@"3. Khinh công / Nhảy cao" state:g_enableHighJump action:@selector(toggleHighJump:)]; yOffset += 40;
-
-        jumpValLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, yOffset, 316, 18)];
-        jumpValLabel.text = [NSString stringWithFormat:@"Hệ số Nhảy cao: %.1fx", g_jumpMultiplier];
-        jumpValLabel.textColor = [UIColor colorWithRed:1.0f green:0.8f blue:0.0f alpha:1.0f];
-        jumpValLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-        jumpValLabel.textAlignment = NSTextAlignmentCenter;
-        [contentScroll addSubview:jumpValLabel]; yOffset += 22;
-
-        UISlider *jumpSlider = [[UISlider alloc] initWithFrame:CGRectMake(10, yOffset, 296, 25)];
-        jumpSlider.minimumValue = 1.0f; jumpSlider.maximumValue = 5.0f; jumpSlider.value = g_jumpMultiplier;
-        [jumpSlider addTarget:self action:@selector(jumpChanged:) forControlEvents:UIControlEventValueChanged];
-        [contentScroll addSubview:jumpSlider]; yOffset += 35;
-
-        [self addToggleButton:CGRectMake(0, yOffset, 316, 36) title:@"4. Ép hạ cánh tức thì" state:g_enableForceLanding action:@selector(toggleForceLanding:)]; yOffset += 44;
-        contentScroll.contentSize = CGSizeMake(316, yOffset + 10);
-
-    } else if (currentTab == 2) {
-        [self addToggleButton:CGRectMake(0, yOffset, 316, 36) title:@"5. Tăng tốc độ toàn cục game" state:g_enableGameSpeed action:@selector(toggleGameSpeed:)]; yOffset += 40;
-
-        gameSpeedValLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, yOffset, 316, 18)];
-        gameSpeedValLabel.text = [NSString stringWithFormat:@"Tốc độ Game: %.1fx", g_gameSpeedScale];
-        gameSpeedValLabel.textColor = [UIColor colorWithRed:1.0f green:0.8f blue:0.0f alpha:1.0f];
-        gameSpeedValLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-        gameSpeedValLabel.textAlignment = NSTextAlignmentCenter;
-        [contentScroll addSubview:gameSpeedValLabel]; yOffset += 22;
-
-        UISlider *gameSpeedSlider = [[UISlider alloc] initWithFrame:CGRectMake(10, yOffset, 296, 25)];
-        gameSpeedSlider.minimumValue = 1.0f; gameSpeedSlider.maximumValue = 10.0f; gameSpeedSlider.value = g_gameSpeedScale;
-        [gameSpeedSlider addTarget:self action:@selector(gameSpeedChanged:) forControlEvents:UIControlEventValueChanged];
-        [contentScroll addSubview:gameSpeedSlider]; yOffset += 35;
-
-        [self addToggleButton:CGRectMake(0, yOffset, 316, 36) title:@"6. Tắt rung màn hình" state:g_enableNoCameraShake action:@selector(toggleNoCameraShake:)]; yOffset += 44;
-        [self addToggleButton:CGRectMake(0, yOffset, 316, 36) title:@"7. Chống khựng chuyển động" state:g_enableNoHalt action:@selector(toggleNoHalt:)]; yOffset += 44;
-        [self addToggleButton:CGRectMake(0, yOffset, 316, 36) title:@"8. Âm thanh bước chân" state:g_enableFootsteps action:@selector(toggleFootsteps:)]; yOffset += 44;
-        [self addToggleButton:CGRectMake(0, yOffset, 316, 36) title:@"9. Hiệu ứng chuyển cảnh" state:g_enableSceneFade action:@selector(toggleSceneFade:)]; yOffset += 44;
-        [self addToggleButton:CGRectMake(0, yOffset, 316, 36) title:@"10. Chớp sáng nhân vật (Blink)" state:g_enableBlink action:@selector(toggleBlink:)]; yOffset += 44;
-        contentScroll.contentSize = CGSizeMake(316, yOffset + 10);
-    }
-}
-
-- (void)addToggleButton:(CGRect)frame title:(NSString *)title state:(bool)state action:(SEL)action {
-    UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
-    btn.frame = frame;
-    [btn setTitle:[NSString stringWithFormat:@"%@: %@", title, state ? @"[ ĐÃ BẬT ]" : @"[ ĐÃ TẮT ]"] forState:UIControlStateNormal];
-    
-    if (state) {
-        [btn setTitleColor:[UIColor colorWithRed:0.2f green:1.0f blue:0.4f alpha:1.0f] forState:UIControlStateNormal];
-        btn.backgroundColor = [UIColor colorWithRed:0.08f green:0.25f blue:0.12f alpha:0.9f];
-    } else {
-        [btn setTitleColor:[UIColor colorWithRed:0.8f green:0.8f blue:0.8f alpha:1.0f] forState:UIControlStateNormal];
-        btn.backgroundColor = [UIColor colorWithRed:0.12f green:0.12f blue:0.18f alpha:0.9f];
-    }
-    
-    btn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
-    btn.layer.cornerRadius = 8.0f;
-    btn.layer.borderWidth = 0.8f;
-    btn.layer.borderColor = state ? [UIColor colorWithRed:0.2f green:1.0f blue:0.4f alpha:0.5f].CGColor : [UIColor colorWithWhite:0.25f alpha:1.0f].CGColor;
-    
-    [btn addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
-    [contentScroll addSubview:btn];
-}
-
-- (void)toggleGodMode:(UIButton *)sender { g_enableGodMode = !g_enableGodMode; [self reloadTabContent]; }
-- (void)toggleSpeedHack:(UIButton *)sender { g_enableSpeedHack = !g_enableSpeedHack; [self reloadTabContent]; }
-- (void)speedChanged:(UISlider *)sender { g_speedMultiplier = sender.value; speedValLabel.text = [NSString stringWithFormat:@"Hệ số Tốc độ: %.1fx", g_speedMultiplier]; }
-- (void)toggleHighJump:(UIButton *)sender { g_enableHighJump = !g_enableHighJump; [self reloadTabContent]; }
-- (void)jumpChanged:(UISlider *)sender { g_jumpMultiplier = sender.value; jumpValLabel.text = [NSString stringWithFormat:@"Hệ số Nhảy cao: %.1fx", g_jumpMultiplier]; }
-- (void)toggleForceLanding:(UIButton *)sender { g_enableForceLanding = !g_enableForceLanding; [self reloadTabContent]; }
-- (void)toggleGameSpeed:(UIButton *)sender { g_enableGameSpeed = !g_enableGameSpeed; [self reloadTabContent]; }
-- (void)gameSpeedChanged:(UISlider *)sender { g_gameSpeedScale = sender.value; gameSpeedValLabel.text = [NSString stringWithFormat:@"Tốc độ Game: %.1fx", g_gameSpeedScale]; }
-- (void)toggleNoCameraShake:(UIButton *)sender { g_enableNoCameraShake = !g_enableNoCameraShake; [self reloadTabContent]; }
-- (void)toggleNoHalt:(UIButton *)sender { g_enableNoHalt = !g_enableNoHalt; [self reloadTabContent]; }
-- (void)toggleFootsteps:(UIButton *)sender { g_enableFootsteps = !g_enableFootsteps; [self reloadTabContent]; }
-- (void)toggleSceneFade:(UIButton *)sender { g_enableSceneFade = !g_enableSceneFade; [self reloadTabContent]; }
-- (void)toggleBlink:(UIButton *)sender { g_enableBlink = !g_enableBlink; [self reloadTabContent]; }
-
 @end
 
+// --- NÚT NỔI KÉO THẢ ---
 @interface DraggableButton : UIButton
 @end
 
@@ -350,6 +265,7 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 }
 @end
 
+// --- KHỞI TẠO & KÍCH HOẠT DOBBY HOOK ---
 __attribute__((constructor)) static void init_sheepct_mod() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t slide = get_unity_slide();
@@ -401,7 +317,7 @@ __attribute__((constructor)) static void init_sheepct_mod() {
         floatingBtn.layer.borderWidth = 1.8f;
         floatingBtn.layer.borderColor = [UIColor colorWithRed:0.0f green:0.8f blue:1.0f alpha:1.0f].CGColor;
 
-        [floatingBtn addTarget:[SheepctModMenuController sharedInstance] action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
+        [floatingBtn addTarget:[WebModMenuController sharedInstance] action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
         [targetWindow addSubview:floatingBtn];
         [targetWindow bringSubviewToFront:floatingBtn];
     });
