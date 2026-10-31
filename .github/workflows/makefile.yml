@@ -25,3 +25,6 @@ jobs:
       with:
         name: SheepctMod-Dylib
         path: libSheepctMod.dylib
+            - name: Clone Dobby Dependency
+      run: git clone --depth=1 https://github.com/jmpews/Dobby.git Dobby
+
