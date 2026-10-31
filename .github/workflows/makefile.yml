@@ -11,7 +11,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Clone Dobby Dependency
         run: git clone --depth=1 https://github.com/jmpews/Dobby.git Dobby
@@ -22,7 +22,7 @@ jobs:
           make
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: libSheepctMod.dylib
           path: libSheepctMod.dylib
