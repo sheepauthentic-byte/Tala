@@ -282,12 +282,14 @@ static void hook_ActorQingGong_ForceLanding(void *self) {
 }
 @end
 
-// --- 5. KHỞI TẠO & KÍCH HOẠT DOBBY HOOK ---
+// --- 5. KHỞI TẠO & KÍCH HOẠT DOBBY HOOK AN TOÀN ---
 __attribute__((constructor)) static void init_sheepct_mod() {
+    // 1. Preload menu ngầm để mở cực mượt
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [[CyberMenuController sharedInstance] preloadMenu];
+        [[WebModMenuController sharedInstance] preloadMenu];
     });
 
+    // 2. Thực hiện Hook và tạo nút nổi sau khi game đã hoàn toàn ổn định
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(7.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t slide = get_unity_slide();
         if (slide > 0) {
@@ -339,7 +341,7 @@ __attribute__((constructor)) static void init_sheepct_mod() {
         floatingBtn.layer.borderWidth = 1.8f;
         floatingBtn.layer.borderColor = [UIColor colorWithRed:0.34f green:0.9f blue:1.0f alpha:1.0f].CGColor;
 
-        [floatingBtn addTarget:[CyberMenuController sharedInstance] action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
+        [floatingBtn addTarget:[WebModMenuController sharedInstance] action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
         [targetWindow addSubview:floatingBtn];
         [targetWindow bringSubviewToFront:floatingBtn];
     });
