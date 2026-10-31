@@ -47,5 +47,10 @@ $(TARGET): $(OBJECTS)
 
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
+CFLAGS = -std=c++11 -O3 -Wall -fPIC -target arm64-apple-ios -I./Dobby/include
+
+build/main.o: main.mm
+	mkdir -p build
+	xcrun --sdk iphoneos clang++ $(CFLAGS) -c main.mm -o build/main.o
 
 .PHONY: all clean
