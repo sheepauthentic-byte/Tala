@@ -249,12 +249,12 @@ __attribute__((constructor)) void initSheepctFullMasterMenu() {
         uintptr_t imageBase = (uintptr_t)_dyld_get_image_header(0);
 
         // Đã mở khóa toàn bộ 6 lệnh hook thực tế gắn trực tiếp vào offset chuẩn:
-        DobbyHook((void *)(imageBase + 0x83818), (void *)hooked_BattleRole_Update, (void **)&orig_BattleRole_Update);
-        DobbyHook((void *)(imageBase + 0x242e3), (void *)hooked_AttackerSkill_HitAttacker, (void **)&orig_AttackerSkill_HitAttacker);
-        DobbyHook((void *)(imageBase + 0x57a26f), (void *)hooked_TimeCtrl_Init, (void **)&orig_TimeCtrl_Init);
-        DobbyHook((void *)(imageBase + 0xd3dc5), (void *)hooked_BulletMove_Update, (void **)&orig_BulletMove_Update);
-        DobbyHook((void *)(imageBase + 0x219bb6), (void *)hooked_GMCmd_IsGm, (void **)&orig_GMCmd_IsGm);
-        DobbyHook((void *)(imageBase + 0x18d11c), (void *)hooked_FarmCtrl_initCtrl, (void **)&orig_FarmCtrl_InitCtrl);
+        // DobbyHook((void *)(imageBase + 0x83818), (void *)hooked_BattleRole_Update, (void **)&orig_BattleRole_Update);
+        // DobbyHook((void *)(imageBase + 0x242e3), (void *)hooked_AttackerSkill_HitAttacker, (void **)&orig_AttackerSkill_HitAttacker);
+        // DobbyHook((void *)(imageBase + 0x57a26f), (void *)hooked_TimeCtrl_Init, (void **)&orig_TimeCtrl_Init);
+        // DobbyHook((void *)(imageBase + 0xd3dc5), (void *)hooked_BulletMove_Update, (void **)&orig_BulletMove_Update);
+        // DobbyHook((void *)(imageBase + 0x219bb6), (void *)hooked_GMCmd_IsGm, (void **)&orig_GMCmd_IsGm);
+        // DobbyHook((void *)(imageBase + 0x18d11c), (void *)hooked_FarmCtrl_initCtrl, (void **)&orig_FarmCtrl_InitCtrl);
 
         UIWindow *window = UIApplication.sharedApplication.keyWindow;
         SheepctModMenu *menu = [[SheepctModMenu alloc] init];
@@ -266,10 +266,7 @@ __attribute__((constructor)) void initSheepctFullMasterMenu() {
         floatBtn.layer.cornerRadius = 22.5f;
         [floatBtn setTitle:@"S" forState:UIControlStateNormal];
         [floatBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        [floatBtn addTarget:^int(UIButton *b){
-            menu.hidden = !menu.hidden;
-            return 0;
-        }(floatBtn) forControlEvents:UIControlEventTouchUpInside];
+        [floatBtn addAction:[UIAction actionWithHandler:^(__kindof UIAction *action) { menu.hidden = !menu.hidden; }] forControlEvents:UIControlEventTouchUpInside];
         [window addSubview:floatBtn];
     });
 }
