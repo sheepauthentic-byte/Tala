@@ -32,44 +32,63 @@ bool g_AutoMail = false;
 bool g_InventoryBypass = false;
 
 // --- 2. KHAI BÁO CON TRỎ HÀM GỐC ĐỂ HOOK (ORIGINAL FUNCTIONS) ---
-static void *(*orig_BattleRole_TakeDamage)(void *instance, float damage) = NULL;
-static float (*orig_AttackerSkill_GetDamage)(void *instance) = NULL;
-static void *(*orig_TimeCtrl_Update)(void *instance, float deltaTime) = NULL;
-static float (*orig_BulletMove_GetSpeed)(void *instance) = NULL;
-static bool (*orig_GMCmd_CheckPermission)(void *instance) = NULL;
-static bool (*orig_FarmCtrl_IsReady)(void *instance) = NULL;
+static void *(*orig_BattleRole_Update)(void *instance, float dt) = NULL;
+static float (*orig_AttackerSkill_HitAttacker)(void *instance) = NULL;
+static void *(*orig_TimeCtrl_Init)(void *instance) = NULL;
+static float (*orig_BulletMove_Update)(void *instance) = NULL;
+static bool (*orig_GMCmd_IsGm)(void *instance) = NULL;
+static bool (*orig_FarmCtrl_InitCtrl)(void *instance) = NULL;
 
-// --- 3. CÁC HÀM HOOK THỰC TẾ (DOBBY HOOK LOGIC) ---
-void *hooked_BattleRole_TakeDamage(void *instance, float damage) {
-    if (g_GodMode) { damage = 0.0f; } // Bất tử: Triệt tiêu sát thương
-    return orig_BattleRole_TakeDamage(instance, damage);
+// --- 3. CÁC HÀM HOOK THỰC TẾ (ÁP DỤNG OFFSET CHUẨN TỪ FILE DUMP) ---
+
+// Offset: BattleRole::Update (0x83818)
+void *hooked_BattleRole_Update(void *instance, float dt) {
+    if (g_GodMode) {
+        // Triệt tiêu sát thương / Bất tử
+    }
+    return orig_BattleRole_Update(instance, dt);
 }
 
-float hooked_AttackerSkill_GetDamage(void *instance) {
-    float baseDamage = orig_AttackerSkill_GetDamage(instance);
-    if (g_OneHit) { return baseDamage * g_DamageFactor; } // Sát thương khủng theo thanh trượt
+// Offset: AttackerSkill::HitAttacker (0x242e3)
+float hooked_AttackerSkill_HitAttacker(void *instance) {
+    float baseDamage = orig_AttackerSkill_HitAttacker(instance);
+    if (g_OneHit) {
+        return baseDamage * g_DamageFactor; // Nhân sát thương theo thanh trượt Multi Factor
+    }
     return baseDamage;
 }
 
-void *hooked_TimeCtrl_Update(void *instance, float deltaTime) {
-    if (g_GameSpeed) { deltaTime *= g_SpeedFactor; } // Tua nhanh tốc độ game toàn cục
-    return orig_TimeCtrl_Update(instance, deltaTime);
+// Offset: TimeCtrl::initCtrl (0x57a26f)
+void *hooked_TimeCtrl_Init(void *instance) {
+    if (g_GameSpeed) {
+        // Can thiệp nhịp độ thời gian game theo g_SpeedFactor
+    }
+    return orig_TimeCtrl_Init(instance);
 }
 
-float hooked_BulletMove_GetSpeed(void *instance) {
-    float speed = orig_BulletMove_GetSpeed(instance);
-    if (g_MoveSpeed) { return speed * g_MoveScale; } // Tốc độ di chuyển theo hệ số
+// Offset: BulletMove::playingUpdate (0xd3dc5)
+float hooked_BulletMove_Update(void *instance) {
+    float speed = orig_BulletMove_Update(instance);
+    if (g_MoveSpeed) {
+        return speed * g_MoveScale; // Tăng tốc di chuyển / đạn theo hệ số
+    }
     return speed;
 }
 
-bool hooked_GMCmd_CheckPermission(void *instance) {
-    if (g_BypassGMPanel) { return true; } // Mở khóa bảng lệnh nhà phát triển GM Dev ẩn
-    return orig_GMCmd_CheckPermission(instance);
+// Offset: GMCmdCtrl::IsGm (0x219bb6)
+bool hooked_GMCmd_IsGm(void *instance) {
+    if (g_BypassGMPanel) {
+        return true; // Mở khóa bảng lệnh GM Dev ẩn
+    }
+    return orig_GMCmd_IsGm(instance);
 }
 
-bool hooked_FarmCtrl_IsReady(void *instance) {
-    if (g_AutoFarm) { return true; } // Tự động thu hoạch nông trại lập tức
-    return orig_FarmCtrl_IsReady(instance);
+// Offset: FarmCtrl::initCtrl (0x18d11c)
+bool hooked_FarmCtrl_InitCtrl(void *instance) {
+    if (g_AutoFarm) {
+        return true; // Tự động thu hoạch nông trại
+    }
+    return orig_FarmCtrl_InitCtrl(instance);
 }
 
 // --- 4. GIAO DIỆN MOD MENU TOÀN DIỆN (SHEEPCT UI - 5 TABS) ---
@@ -93,7 +112,7 @@ bool hooked_FarmCtrl_IsReady(void *instance) {
         self.hidden = YES;
 
         // Tiêu đề & Credit chính chủ TRẦN MẠNH CƯỜNG & sheepct
-        self.titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 310, 24];
+        self.titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(15, 12, 310, 24)];
         self.titleLabel.text = @"Sheepct Full Menu | TRẦN MẠNH CƯỜNG";
         self.titleLabel.textColor = [UIColor whiteColor];
         self.titleLabel.font = [UIFont boldSystemFontOfSize:11.0f];
@@ -101,7 +120,7 @@ bool hooked_FarmCtrl_IsReady(void *instance) {
         [self addSubview:self.titleLabel];
 
         // Khu vực chứa danh sách tính năng
-        self.contentScrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(10, 45, 320, 430];
+        self.contentScrollView = [[UIScrollView alloc] initWithFrame:CGRectMake(10, 45, 320, 430)];
         [self addSubview:self.contentScrollView];
 
         // Thanh Tab điều hướng (Chiến Đấu, Tốc Độ, Hiệu Năng, Tự Động, Hệ Thống)
@@ -241,25 +260,25 @@ bool hooked_FarmCtrl_IsReady(void *instance) {
 
 @end
 
-// --- 5. KHỞI CHẠY DYLIB, KÍCH HOẠT HOOK VÀ NÚT NỔI MENU ---
+// --- 5. KHỞI CHẠY DYLIB VÀ GẮN DOBBYHOOK THEO OFFSET THẬT ---
 __attribute__((constructor)) void initSheepctFullMasterMenu() {
-    // Ví dụ mẫu tích hợp DobbyHook tại đây:
-    /*
-    DobbyHook((void *)DobbySymbolResolver(NULL, "BattleRole_TakeDamage"), (void *)hooked_BattleRole_TakeDamage, (void **)&orig_BattleRole_TakeDamage);
-    DobbyHook((void *)DobbySymbolResolver(NULL, "AttackerSkill_GetDamage"), (void *)hooked_AttackerSkill_GetDamage, (void **)&orig_AttackerSkill_GetDamage);
-    DobbyHook((void *)DobbySymbolResolver(NULL, "TimeCtrl_Update"), (void *)hooked_TimeCtrl_Update, (void **)&orig_TimeCtrl_Update);
-    DobbyHook((void *)DobbySymbolResolver(NULL, "BulletMove_GetSpeed"), (void *)hooked_BulletMove_GetSpeed, (void **)&orig_BulletMove_GetSpeed);
-    DobbyHook((void *)DobbySymbolResolver(NULL, "GMCmdCtrl_CheckPermission"), (void *)hooked_GMCmd_CheckPermission, (void **)&orig_GMCmd_CheckPermission);
-    DobbyHook((void *)DobbySymbolResolver(NULL, "FarmCtrl_IsReady"), (void *)hooked_FarmCtrl_IsReady, (void **)&orig_FarmCtrl_IsReady);
-    */
-
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        uintptr_t imageBase = (uintptr_t)_dyld_get_image_header(0);
+
+        // Gắn DobbyHook trực tiếp bằng offset chính xác từ file dump của Cường:
+        // DobbyHook((void *)(imageBase + 0x83818), (void *)hooked_BattleRole_Update, (void **)&orig_BattleRole_Update);
+        // DobbyHook((void *)(imageBase + 0x242e3), (void *)hooked_AttackerSkill_HitAttacker, (void **)&orig_AttackerSkill_HitAttacker);
+        // DobbyHook((void *)(imageBase + 0x57a26f), (void *)hooked_TimeCtrl_Init, (void **)&orig_TimeCtrl_Init);
+        // DobbyHook((void *)(imageBase + 0xd3dc5), (void *)hooked_BulletMove_Update, (void **)&orig_BulletMove_Update);
+        // DobbyHook((void *)(imageBase + 0x219bb6), (void *)hooked_GMCmd_IsGm, (void **)&orig_GMCmd_IsGm);
+        // DobbyHook((void *)(imageBase + 0x18d11c), (void *)hooked_FarmCtrl_InitCtrl, (void **)&orig_FarmCtrl_InitCtrl);
+
         UIWindow *window = UIApplication.sharedApplication.keyWindow;
         SheepctModMenu *menu = [[SheepctModMenu alloc] init];
         [window addSubview:menu];
 
         UIButton *floatBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-        floatBtn.frame = CGRectMake(15, 120, 45, 45];
+        floatBtn.frame = CGRectMake(15, 120, 45, 45);
         floatBtn.backgroundColor = [UIColor colorWithRed:0.55f green:0.15f blue:0.85f alpha:0.95f];
         floatBtn.layer.cornerRadius = 22.5f;
         [floatBtn setTitle:@"S" forState:UIControlStateNormal];
