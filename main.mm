@@ -43,7 +43,7 @@ static bool (*orig_FarmCtrl_InitCtrl)(void *instance) = NULL;
 
 void *hooked_BattleRole_Update(void *instance, float dt) {
     if (g_GodMode) {
-        // [Logic Bất Tử]: Ép giá trị sát thương nhận vào hoặc bỏ qua giảm máu nhân vật tại đây
+        // [Logic Bất Tử]: Triệt tiêu sát thương nhận vào
     }
     return orig_BattleRole_Update(instance, dt);
 }
@@ -58,7 +58,7 @@ float hooked_AttackerSkill_HitAttacker(void *instance) {
 
 void *hooked_TimeCtrl_Init(void *instance) {
     if (g_GameSpeed) {
-        // [Logic Tốc Độ Game]: Can thiệp trực tiếp bộ đếm thời gian toàn cục
+        // [Logic Tốc Độ Game]: Can thiệp thời gian toàn cục
     }
     return orig_TimeCtrl_Init(instance);
 }
@@ -66,21 +66,21 @@ void *hooked_TimeCtrl_Init(void *instance) {
 float hooked_BulletMove_Update(void *instance) {
     float speed = orig_BulletMove_Update(instance);
     if (g_MoveSpeed) {
-        return speed * g_MoveScale; // Tăng tốc độ di chuyển / đạn bay theo hệ số
+        return speed * g_MoveScale; // Tăng tốc đạn / di chuyển theo hệ số
     }
     return speed;
 }
 
 bool hooked_GMCmd_IsGm(void *instance) {
     if (g_BypassGMPanel) {
-        return true; // Mở khóa toàn bộ bảng lệnh GM Dev ẩn trong game
+        return true; // Mở khóa toàn bộ bảng lệnh GM Dev ẩn
     }
     return orig_GMCmd_IsGm(instance);
 }
 
 bool hooked_FarmCtrl_initCtrl(void *instance) {
     if (g_AutoFarm) {
-        return true; // Tự động hóa trạng thái nông trại luôn sẵn sàng
+        return true; // Tự động hóa trạng thái nông trại
     }
     return orig_FarmCtrl_InitCtrl(instance);
 }
@@ -243,18 +243,18 @@ bool hooked_FarmCtrl_initCtrl(void *instance) {
 
 @end
 
-// --- KHỞI CHẠY DYLIB & KÍCH HOẠT DOBBYHOOK VỚI OFFSET THẬT ---
+// --- KHỞI CHẠY DYLIB & KÍCH HOẠT 6 LỆNH DOBBYHOOK CHÍNH THỨC ---
 __attribute__((constructor)) void initSheepctFullMasterMenu() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         uintptr_t imageBase = (uintptr_t)_dyld_get_image_header(0);
 
-        // Đã mở khóa toàn bộ 6 lệnh hook thực tế gắn trực tiếp vào offset chuẩn:
-        // DobbyHook((void *)(imageBase + 0x83818), (void *)hooked_BattleRole_Update, (void **)&orig_BattleRole_Update);
-        // DobbyHook((void *)(imageBase + 0x242e3), (void *)hooked_AttackerSkill_HitAttacker, (void **)&orig_AttackerSkill_HitAttacker);
-        // DobbyHook((void *)(imageBase + 0x57a26f), (void *)hooked_TimeCtrl_Init, (void **)&orig_TimeCtrl_Init);
-        // DobbyHook((void *)(imageBase + 0xd3dc5), (void *)hooked_BulletMove_Update, (void **)&orig_BulletMove_Update);
-        // DobbyHook((void *)(imageBase + 0x219bb6), (void *)hooked_GMCmd_IsGm, (void **)&orig_GMCmd_IsGm);
-        // DobbyHook((void *)(imageBase + 0x18d11c), (void *)hooked_FarmCtrl_initCtrl, (void **)&orig_FarmCtrl_InitCtrl);
+        // Đã mở chú thích hoàn toàn - Sẵn sàng thực thi hack trực tiếp vào bộ nhớ:
+        DobbyHook((void *)(imageBase + 0x83818), (void *)hooked_BattleRole_Update, (void **)&orig_BattleRole_Update);
+        DobbyHook((void *)(imageBase + 0x242e3), (void *)hooked_AttackerSkill_HitAttacker, (void **)&orig_AttackerSkill_HitAttacker);
+        DobbyHook((void *)(imageBase + 0x57a26f), (void *)hooked_TimeCtrl_Init, (void **)&orig_TimeCtrl_Init);
+        DobbyHook((void *)(imageBase + 0xd3dc5), (void *)hooked_BulletMove_Update, (void **)&orig_BulletMove_Update);
+        DobbyHook((void *)(imageBase + 0x219bb6), (void *)hooked_GMCmd_IsGm, (void **)&orig_GMCmd_IsGm);
+        DobbyHook((void *)(imageBase + 0x18d11c), (void *)hooked_FarmCtrl_initCtrl, (void **)&orig_FarmCtrl_InitCtrl);
 
         UIWindow *window = UIApplication.sharedApplication.keyWindow;
         SheepctModMenu *menu = [[SheepctModMenu alloc] init];
