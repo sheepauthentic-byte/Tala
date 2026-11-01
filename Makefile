@@ -1,7 +1,7 @@
 CXX = xcrun --sdk iphoneos clang++
 SDK_PATH = $(shell xcrun --sdk iphoneos --show-sdk-path)
 
-# Thêm -x objective-c++ để trình biên dịch hiểu các từ khóa @protocol, @interface của Objective-C
+# Thêm -x objective-c++ để trình biên dịch hiểu cú pháp Objective-C/C++
 CXXFLAGS = -arch arm64 -isysroot $(SDK_PATH) -miphoneos-version-min=12.0 -fPIC -x objective-c++ -Idobby/include
 LDFLAGS = -shared -lobjc -framework Foundation dobby/build/libdobby.a
 
@@ -19,8 +19,9 @@ setup_dobby:
 		-DCMAKE_CXX_COMPILER=clang++
 	cd dobby/build && make -j$(sysctl -n hw.ncpu)
 
-LibSheepctMod.dylib: patch_force_success.cpp
-	$(CXX) $(CXXFLAGS) patch_force_success.cpp $(LDFLAGS) -o LibSheepctMod.dylib
+# Biên dịch tệp .mm đã đổi tên
+LibSheepctMod.dylib: patch_force_success.mm
+	$(CXX) $(CXXFLAGS) patch_force_success.mm $(LDFLAGS) -o LibSheepctMod.dylib
 
 clean:
 	rm -f LibSheepctMod.dylib
