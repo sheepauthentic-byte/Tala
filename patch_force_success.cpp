@@ -5,8 +5,11 @@
 #include <cstring>
 #include "dobby.h"
 
+#define FINAL_LOG(fmt, ...) NSLog(@"[Sheepct-AOV-Final] " fmt, ##__VA_ARGS__)
+
 extern "C" {
-    static uintptr_t get_aovnet_base(void) {
+    // Lấy base address của aovnet framework một cách an toàn và chính xác
+    static uintptr_t get_framework_base(void) {
         uint32_t count = _dyld_image_count();
         for (uint32_t i = 0; i < count; i++) {
             const char *name = _dyld_get_image_name(i);
@@ -17,25 +20,40 @@ extern "C" {
         return 0;
     }
 
+    // Con trỏ lưu hàm gốc đề phòng trường hợp cần gọi chuỗi tiến trình phụ trợ
     static int (*orig_apiclient_paid)(void *self, SEL _cmd) = nullptr;
+
+    // Hàm hook thay thế logic kiểm tra bản quyền ngầm, ép trả về thành công (1)
     static int hooked_apiclient_paid(void *self, SEL _cmd) {
-        if (orig_apiclient_paid) {
-            orig_apiclient_paid(self, _cmd);
-        }
+        FINAL_LOG("Intercepted _apiclient_paid. Forcing authorization success (1).");
         return 1;
     }
 
-    static void apply_mapv1_bypass(void) {
-        uintptr_t base = get_aovnet_base();
-        if (!base) return;
+    // Thực thi patch qua DobbyHook với kiểm tra trạng thái trả về
+    static void execute_final_patch(void) {
+        uintptr_t base = get_framework_base();
+        if (!base) {
+            FINAL_LOG("Error: Target aovnet framework base address not found.");
+            return;
+        }
 
-        void *paidFuncAddr = (void *)(base + 0xc5d628);
-        DobbyHook(paidFuncAddr, (void *)hooked_apiclient_paid, (void **)&orig_apiclient_paid);
+        // Địa chỉ offset chuẩn xác từ phân tích disasm mapv1: 0xc5d628[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span)
+        void *targetAddr = (void *)(base + 0xc5d628);
+        FINAL_LOG("Target hook address resolved at: %p", targetAddr);
+
+        int status = DobbyHook(targetAddr, (void *)hooked_apiclient_paid, (void **)&orig_apiclient_paid);
+        if (status == RS_SUCCESS) {
+            FINAL_LOG("DobbyHook successfully established for map v1.");
+        } else {
+            FINAL_LOG("DobbyHook failed with status code: %d", status);
+        }
     }
 
-    __attribute__((constructor)) static void init_mod(void) {
+    // Khởi tạo constructor chạy tự động ngay khi dylib được nạp vào tiến trình IPA
+    __attribute__((constructor)) static void sheepct_final_entry(void) {
         @autoreleasepool {
-            apply_mapv1_bypass();
+            FINAL_LOG("Initializing Sheepct Final Patch Module...");
+            execute_final_patch();
         }
     }
 }
