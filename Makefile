@@ -8,9 +8,16 @@ LDFLAGS = -shared -lobjc -framework Foundation dobby/build/libdobby.a
 all: setup_dobby LibSheepctMod.dylib
 
 setup_dobby:
-	@echo "Building Dobby static library via CMake..."
+setup_dobby:
+	@echo "Building Dobby static library via CMake for iOS ARM64..."
 	mkdir -p dobby/build
-	cd dobby/build && cmake .. -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_SYSROOT=$(SDK_PATH) -DCMAKE_OSX_ARCHITECTURES=arm64
+	cd dobby/build && cmake .. \
+		-DCMAKE_SYSTEM_NAME=Darwin \
+		-DCMAKE_SYSTEM_PROCESSOR=arm64 \
+		-DCMAKE_OSX_SYSROOT=$(SDK_PATH) \
+		-DCMAKE_OSX_ARCHITECTURES=arm64 \
+		-DCMAKE_C_COMPILER=clang \
+		-DCMAKE_CXX_COMPILER=clang++
 	cd dobby/build && make -j$(sysctl -n hw.ncpu)
 
 LibSheepctMod.dylib: patch_force_success.cpp
