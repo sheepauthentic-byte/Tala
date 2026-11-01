@@ -1,8 +1,3 @@
-// Language: C++ / Objective-C++
-// File: tweek.cpp
-// Runtime: iOS / ARM64 / Memory Injection
-// Target: aovnet.framework/aovnet
-
 #import <Foundation/Foundation.h>
 #import <mach-o/dyld.h>
 #include <sys/mman.h>
@@ -21,36 +16,29 @@ extern "C" {
         return 0;
     }
 
-    static void write_assembly_patch(void *target_addr) {
+    static void patch_instruction_at(void *target_addr, uint32_t instruction) {
         uintptr_t page_size = getpagesize();
         uintptr_t page_aligned_addr = (uintptr_t)target_addr & ~(page_size - 1);
 
         mprotect((void *)page_aligned_addr, page_size, PROT_READ | PROT_WRITE | PROT_EXEC);
-
-        // Ép thanh ghi trả về giá trị thành công:
-        // 1. mov w0, #0x1  (Hex: 20 00 80 D2 -> 0xD2800020)
-        // 2. ret            (Hex: C0 03 5D D6 -> 0xD65FC0C0)
-        uint32_t patch_instructions[2] = { 0xD2800020, 0xD65FC0C0 };
-        
-        memcpy(target_addr, patch_instructions, sizeof(patch_instructions));
-
+        memcpy(target_addr, &instruction, 4);
         mprotect((void *)page_aligned_addr, page_size, PROT_READ | PROT_EXEC);
     }
 
-    static void execute_patch_sequence(void) {
+    static void apply_menu_safe_patches(void) {
         uintptr_t base = get_aovnet_base();
         if (!base) return;
 
-        // Offset chính xác của showLoginForm trên MAP V1 (0x1dadcc8) hoặc CrackVT (0x1dabee8)
-        uintptr_t target_offset = 0x1dadcc8;
-        void *target_func = (void *)(base + target_offset);
+        void *loginFormAddr = (void *)(base + 0x1dadcc8);
+        patch_instruction_at(loginFormAddr, 0xD503201F);
 
-        write_assembly_patch(target_func);
+        void *expiredFormAddr = (void *)(base + 0x1db0384);
+        patch_instruction_at(expiredFormAddr, 0xD503201F);
     }
 
-    __attribute__((constructor)) static void init_patcher(void) {
+    __attribute__((constructor)) static void init_mod(void) {
         @autoreleasepool {
-            execute_patch_sequence();
+            apply_menu_safe_patches();
         }
     }
 }
