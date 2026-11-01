@@ -1,12 +1,8 @@
-# ==============================================================================
-# Makefile cho iOS Tweak / Dylib
-# ==============================================================================
-
 # Tên file đầu ra (không có đuôi .dylib)
 TARGET = MyBypassTweak
 
-# THAY ĐỔI TÊN NÀY thành tên file .m thực tế trong repo của bạn (ví dụ: tweak.m, bypass.m, v.v.)
-SRC = tên_file_thực_tế.m
+# Đặt đúng tên file .m của bạn ở đây
+SRC = tweak.m
 
 # Các Framework cần thiết cho iOS
 FRAMEWORKS = -framework Foundation -framework UIKit
