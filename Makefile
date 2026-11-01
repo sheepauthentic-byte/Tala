@@ -5,8 +5,8 @@
 # Tên file đầu ra (không có đuôi .dylib)
 TARGET = MyBypassTweak
 
-# Danh sách các file nguồn (.m, .c, .cpp)
-SRC = main.m
+# THAY ĐỔI TÊN NÀY thành tên file .m thực tế trong repo của bạn (ví dụ: tweak.m, bypass.m, v.v.)
+SRC = tên_file_thực_tế.m
 
 # Các Framework cần thiết cho iOS
 FRAMEWORKS = -framework Foundation -framework UIKit
@@ -17,7 +17,7 @@ CFLAGS = -dynamiclib -arch arm64 -isysroot $(shell xcrun --sdk iphoneos --show-s
 all: $(TARGET).dylib
 
 $(TARGET).dylib: $(SRC)
-	@echo "Đang biên dịch $(TARGET).dylib..."
+	@echo "Đang biên dịch $(TARGET).dylib từ $(SRC)..."
 	clang $(CFLAGS) $(FRAMEWORKS) $(SRC) -o $(TARGET).dylib
 	@echo "Biên dịch thành công!"
 
