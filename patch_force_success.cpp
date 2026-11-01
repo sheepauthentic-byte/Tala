@@ -3,6 +3,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <cstring>
+#include "dobby.h"
 
 extern "C" {
     static uintptr_t get_aovnet_base(void) {
@@ -16,33 +17,25 @@ extern "C" {
         return 0;
     }
 
-    static void patch_instructions(void *target_addr, const uint32_t *instructions, size_t count) {
-        uintptr_t page_size = getpagesize();
-        uintptr_t page_aligned_addr = (uintptr_t)target_addr & ~(page_size - 1);
-
-        mprotect((void *)page_aligned_addr, page_size, PROT_READ | PROT_WRITE | PROT_EXEC);
-        for (size_t i = 0; i < count; i++) {
-            *((uint32_t *)target_addr + i) = instructions[i];
+    static int (*orig_apiclient_paid)(void *self, SEL _cmd) = nullptr;
+    static int hooked_apiclient_paid(void *self, SEL _cmd) {
+        if (orig_apiclient_paid) {
+            orig_apiclient_paid(self, _cmd);
         }
-        mprotect((void *)page_aligned_addr, page_size, PROT_READ | PROT_EXEC);
+        return 1;
     }
 
-    static void apply_exact_bypass(void) {
+    static void apply_mapv1_bypass(void) {
         uintptr_t base = get_aovnet_base();
         if (!base) return;
 
-        uint32_t success_return_patch[] = { 0x52800020, 0xD65F03C0 };
-
-        void *loginFormAddr = (void *)(base + 0x1dadcc8);
-        patch_instructions(loginFormAddr, success_return_patch, 2);
-
-        void *expiredFormAddr = (void *)(base + 0x1db0384);
-        patch_instructions(expiredFormAddr, success_return_patch, 2);
+        void *paidFuncAddr = (void *)(base + 0xc5d628);
+        DobbyHook(paidFuncAddr, (void *)hooked_apiclient_paid, (void **)&orig_apiclient_paid);
     }
 
     __attribute__((constructor)) static void init_mod(void) {
         @autoreleasepool {
-            apply_exact_bypass();
+            apply_mapv1_bypass();
         }
     }
 }
