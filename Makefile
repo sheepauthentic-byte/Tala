@@ -1,7 +1,6 @@
 CXX = xcrun --sdk iphoneos clang++
 SDK_PATH = $(shell xcrun --sdk iphoneos --show-sdk-path)
 
-# Khai báo chuẩn cờ cho Objective-C++ và đường dẫn trỏ tới thư mục include của Dobby
 CXXFLAGS = -arch arm64 -isysroot $(SDK_PATH) -miphoneos-version-min=12.0 -fPIC -x objective-c++ -Idobby/include
 LDFLAGS = -shared -lobjc -framework Foundation dobby/build/libdobby.a
 
@@ -10,15 +9,16 @@ all: setup_dobby LibSheepctMod.dylib
 setup_dobby:
 	@echo "Checking and building Dobby static library..."
 	if [ ! -f dobby/build/libdobby.a ]; then \
-		mkdir -p dobby/build; \
-		cd dobby/build && cmake .. \
+		mkdir -p dobby/build && \
+		cd dobby/build && \
+		cmake .. \
 			-DCMAKE_SYSTEM_NAME=Darwin \
 			-DCMAKE_SYSTEM_PROCESSOR=arm64 \
 			-DCMAKE_OSX_SYSROOT=$(SDK_PATH) \
 			-DCMAKE_OSX_ARCHITECTURES=arm64 \
 			-DCMAKE_C_COMPILER=clang \
-			-DCMAKE_CXX_COMPILER=clang++; \
-		cd dobby/build && make -j$(sysctl -n hw.ncpu); \
+			-DCMAKE_CXX_COMPILER=clang++ && \
+		make -j$$(sysctl -n hw.ncpu); \
 	fi
 
 LibSheepctMod.dylib: patch_force_success.mm
