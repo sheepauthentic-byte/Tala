@@ -1,32 +1,19 @@
 name: Build iOS Dylib
 
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: macos-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Clone Dobby and Initialize Submodules
-        run: |
-          rm -rf Dobby
-          git clone https://github.com/jmpews/Dobby.git Dobby
-          cd Dobby
-          git submodule update --init --recursive
-
-      - name: Build Dylib
-        run: |
-          make clean
-          make
+      - name: Build with Makefile
+        run: make
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: libSheepctMod.dylib
-          path: libSheepctMod.dylib
+          name: MyBypassTweak
+          path: MyBypassTweak.dylib
