@@ -31,16 +31,11 @@ extern "C" {
         uintptr_t base = get_aovnet_base();
         if (!base) return;
 
-        // Mã máy ARM64 cho:
-        // mov w0, #1  (0x52800020)
-        // ret         (0xD65F03C0)
         uint32_t success_return_patch[] = { 0x52800020, 0xD65F03C0 };
 
-        // 1. Patch tại showLoginForm (0x1dadcc8) ép trả về thành công ngay lập tức
         void *loginFormAddr = (void *)(base + 0x1dadcc8);
         patch_instructions(loginFormAddr, success_return_patch, 2);
 
-        // 2. Patch tại showExpiredForm (0x1db0384) ép trả về thành công ngay lập tức
         void *expiredFormAddr = (void *)(base + 0x1db0384);
         patch_instructions(expiredFormAddr, success_return_patch, 2);
     }
