@@ -8,7 +8,6 @@
 #define FINAL_LOG(fmt, ...) NSLog(@"[Sheepct-AOV-Final] " fmt, ##__VA_ARGS__)
 
 extern "C" {
-    // Lấy base address của aovnet framework một cách an toàn và chính xác
     static uintptr_t get_framework_base(void) {
         uint32_t count = _dyld_image_count();
         for (uint32_t i = 0; i < count; i++) {
@@ -20,16 +19,13 @@ extern "C" {
         return 0;
     }
 
-    // Con trỏ lưu hàm gốc đề phòng trường hợp cần gọi chuỗi tiến trình phụ trợ
     static int (*orig_apiclient_paid)(void *self, SEL _cmd) = nullptr;
 
-    // Hàm hook thay thế logic kiểm tra bản quyền ngầm, ép trả về thành công (1)
     static int hooked_apiclient_paid(void *self, SEL _cmd) {
         FINAL_LOG("Intercepted _apiclient_paid. Forcing authorization success (1).");
         return 1;
     }
 
-    // Thực thi patch qua DobbyHook với kiểm tra trạng thái trả về
     static void execute_final_patch(void) {
         uintptr_t base = get_framework_base();
         if (!base) {
@@ -37,7 +33,6 @@ extern "C" {
             return;
         }
 
-        // Địa chỉ offset chuẩn xác từ phân tích disasm mapv1: 0xc5d628[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span)
         void *targetAddr = (void *)(base + 0xc5d628);
         FINAL_LOG("Target hook address resolved at: %p", targetAddr);
 
@@ -49,7 +44,6 @@ extern "C" {
         }
     }
 
-    // Khởi tạo constructor chạy tự động ngay khi dylib được nạp vào tiến trình IPA
     __attribute__((constructor)) static void sheepct_final_entry(void) {
         @autoreleasepool {
             FINAL_LOG("Initializing Sheepct Final Patch Module...");
