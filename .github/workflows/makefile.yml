@@ -21,3 +21,9 @@ jobs:
     - name: Build Dylib via Makefile
       run: |
         make
+
+    - name: Upload Built Dylib Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: LibSheepctMod
+        path: LibSheepctMod.dylib
