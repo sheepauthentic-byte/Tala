@@ -3,7 +3,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <cstring>
-#include "dobby.h"
 
 extern "C" {
     static uintptr_t get_aovnet_base(void) {
@@ -17,43 +16,38 @@ extern "C" {
         return 0;
     }
 
-    static void patch_instruction_at(void *target_addr, uint32_t instruction) {
+    static void patch_instructions(void *target_addr, const uint32_t *instructions, size_t count) {
         uintptr_t page_size = getpagesize();
         uintptr_t page_aligned_addr = (uintptr_t)target_addr & ~(page_size - 1);
 
         mprotect((void *)page_aligned_addr, page_size, PROT_READ | PROT_WRITE | PROT_EXEC);
-        memcpy(target_addr, &instruction, 4);
+        for (size_t i = 0; i < count; i++) {
+            *((uint32_t *)target_addr + i) = instructions[i];
+        }
         mprotect((void *)page_aligned_addr, page_size, PROT_READ | PROT_EXEC);
     }
 
-    // Hook hàm kiểm tra key: Bất kể nhập gì, gọi hàm gốc xong ép trả về 1 (Thành công)
-    static int (*orig_validateKey)(void *self, SEL _cmd, id inputString) = nullptr;
-    static int hooked_validateKey(void *self, SEL _cmd, id inputString) {
-        // In ra log để trace nếu cần thiết
-        NSLog(@"[SheepctMod] Bypassed key validation for input: %@", inputString);
-        if (orig_validateKey) {
-            // Vẫn gọi hàm gốc nếu cần duy trì đối tượng, nhưng ép trả về giá trị thành công
-            orig_validateKey(self, _cmd, inputString);
-        }
-        return 1; // 1 = Hợp lệ / Success
-    }
-
-    static void apply_universal_bypass(void) {
+    static void apply_exact_bypass(void) {
         uintptr_t base = get_aovnet_base();
         if (!base) return;
 
-        // Vẫn giữ lệnh nop form để không bị kẹt hiển thị
-        patch_instruction_at((void *)(base + 0x1dadcc8), 0xD503201F);
-        patch_instruction_at((void *)(base + 0x1db0384), 0xD503201F);
+        // Mã máy ARM64 cho:
+        // mov w0, #1  (0x52800020)
+        // ret         (0xD65F03C0)
+        uint32_t success_return_patch[] = { 0x52800020, 0xD65F03C0 };
 
-        // Hook vào hàm xử lý xác thực bên trong framework (offset validator)
-        void *validateFuncAddr = (void *)(base + 0x1dadcc8); 
-        DobbyHook(validateFuncAddr, (void *)hooked_validateKey, (void **)&orig_validateKey);
+        // 1. Patch tại showLoginForm (0x1dadcc8) ép trả về thành công ngay lập tức
+        void *loginFormAddr = (void *)(base + 0x1dadcc8);
+        patch_instructions(loginFormAddr, success_return_patch, 2);
+
+        // 2. Patch tại showExpiredForm (0x1db0384) ép trả về thành công ngay lập tức
+        void *expiredFormAddr = (void *)(base + 0x1db0384);
+        patch_instructions(expiredFormAddr, success_return_patch, 2);
     }
 
     __attribute__((constructor)) static void init_mod(void) {
         @autoreleasepool {
-            apply_universal_bypass();
+            apply_exact_bypass();
         }
     }
 }
