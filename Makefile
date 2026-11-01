@@ -4,7 +4,8 @@
 
 TARGET = libSheepctMod.dylib
 CC = xcrun --sdk iphoneos clang++
-CFLAGS = -dynamiclib -arch arm64 -O3 -std=c++17 -F$(SDKROOT)/System/Library/Frameworks -miphoneos-version-min=12.0
+SDKROOT = $(shell xcrun --sdk iphoneos --show-sdk-path)
+CFLAGS = -dynamiclib -arch arm64 -O3 -std=c++17 -F$(SDKROOT)/System/Library/Frameworks -isysroot $(SDKROOT) -miphoneos-version-min=12.0
 LDFLAGS = -lobjc -framework Foundation
 
 all: $(TARGET)
