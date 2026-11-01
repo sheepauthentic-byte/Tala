@@ -1,24 +1,50 @@
-# Tên file đầu ra (không có đuôi .dylib)
-TARGET = MyBypassTweak
+# ==========================================
+# Makefile biên dịch iOS Dynamic Library (.dylib)
+# Tác giả: TRẦN MẠNH CƯỜNG (Project: sheepct)
+# ==========================================
 
-# Đặt đúng tên file .m của bạn ở đây
-SRC = tweak.m
+TARGET = libSheepctMod.dylib
+CC = clang
+CXX = clang++
 
-# Các Framework cần thiết cho iOS
-FRAMEWORKS = -framework Foundation -framework UIKit
+SRC_DIR = .
+BUILD_DIR = build
 
-# Cờ biên dịch (Compile Flags)
-CFLAGS = -dynamiclib -arch arm64 -isysroot $(shell xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=12.0
+SOURCES = $(wildcard $(SRC_DIR)/*.m) $(wildcard $(SRC_DIR)/*.mm) $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(SRC_DIR)/*.c)
+OBJECTS = $(patsubst $(SRC_DIR)/%.m, $(BUILD_DIR)/%.o, \
+          $(patsubst $(SRC_DIR)/%.mm, $(BUILD_DIR)/%.o, \
+          $(patsubst $(SRC_DIR)/%.cpp, $(BUILD_DIR)/%.o, \
+          $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SOURCES)))))
 
-all: $(TARGET).dylib
+CFLAGS = -fobjc-arc -O3 -Wall -fPIC
+CXXFLAGS = -std=c++11 -O3 -Wall -fPIC
+LDFLAGS = -dynamiclib -undefined dynamic_lookup -framework Foundation -framework UIKit -framework CoreGraphics -framework QuartzCore
 
-$(TARGET).dylib: $(SRC)
-	@echo "Đang biên dịch $(TARGET).dylib từ $(SRC)..."
-	clang $(CFLAGS) $(FRAMEWORKS) $(SRC) -o $(TARGET).dylib
-	@echo "Biên dịch thành công!"
+all: $(BUILD_DIR) $(BUILD_DIR)/$(TARGET)
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.m
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.mm
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/$(TARGET): $(OBJECTS)
+	$(CXX) $(LDFLAGS) -o $@ $^
+	@echo ""
+	@echo " Biên dịch thành công thư viện: $(TARGET)"
+	@echo " Bản quyền: sheepct (TRẦN MẠNH CƯỜNG)"
+	@echo ""
 
 clean:
-	@echo "Đang dọn dẹp file cũ..."
-	rm -f $(TARGET).dylib
+	rm -rf $(BUILD_DIR) $(TARGET)
 
 .PHONY: all clean
