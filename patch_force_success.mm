@@ -37,7 +37,7 @@ extern "C" {
         FINAL_LOG("Target hook address resolved at: %p", targetAddr);
 
         int status = DobbyHook(targetAddr, (void *)hooked_apiclient_paid, (void **)&orig_apiclient_paid);
-        if (status == RS_SUCCESS) {
+        if (status == 0) {
             FINAL_LOG("DobbyHook successfully established for map v1.");
         } else {
             FINAL_LOG("DobbyHook failed with status code: %d", status);
