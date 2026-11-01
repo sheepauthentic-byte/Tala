@@ -4,8 +4,10 @@
 # ==========================================
 
 TARGET = libSheepctMod.dylib
-CC = clang
-CXX = clang++
+CC = xcrun --sdk iphoneos clang
+CXX = xcrun --sdk iphoneos clang++
+IOS_VERSION_MIN = -miphoneos-version-min=12.0
+ARCH = -arch arm64
 
 SRC_DIR = .
 BUILD_DIR = build
@@ -16,9 +18,9 @@ OBJECTS = $(patsubst $(SRC_DIR)/%.m, $(BUILD_DIR)/%.o, \
           $(patsubst $(SRC_DIR)/%.cpp, $(BUILD_DIR)/%.o, \
           $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SOURCES)))))
 
-CFLAGS = -fobjc-arc -O3 -Wall -fPIC
-CXXFLAGS = -std=c++11 -O3 -Wall -fPIC
-LDFLAGS = -dynamiclib -undefined dynamic_lookup -framework Foundation -framework UIKit -framework CoreGraphics -framework QuartzCore
+CFLAGS = $(ARCH) $(IOS_VERSION_MIN) -fobjc-arc -O3 -Wall -fPIC
+CXXFLAGS = $(ARCH) $(IOS_VERSION_MIN) -std=c++11 -O3 -Wall -fPIC
+LDFLAGS = $(ARCH) $(IOS_VERSION_MIN) -dynamiclib -undefined dynamic_lookup -framework Foundation -framework UIKit -framework CoreGraphics -framework QuartzCore
 
 all: $(BUILD_DIR) $(BUILD_DIR)/$(TARGET)
 
