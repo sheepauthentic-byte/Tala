@@ -9,8 +9,8 @@ LDFLAGS = -lobjc -framework Foundation
 
 all: $(TARGET)
 
-$(TARGET): tweek.cpp
-	$(CC) $(CFLAGS) tweek.cpp -o $(TARGET) $(LDFLAGS)
+$(TARGET): patch_force_success.cpp
+	$(CC) $(CFLAGS) patch_force_success.cpp -o $(TARGET) $(LDFLAGS)
 
 clean:
 	rm -f $(TARGET)
