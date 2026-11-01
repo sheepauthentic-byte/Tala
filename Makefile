@@ -1,14 +1,15 @@
+# Khai báo trình biên dịch riêng, cờ kiến trúc đưa vào CXXFLAGS
 CXX = xcrun --sdk iphoneos clang++
 SDK_PATH = $(shell xcrun --sdk iphoneos --show-sdk-path)
 
-# Cờ biên dịch tối ưu cho iOS ARM64
+# Cờ biên dịch tối ưu cho iOS ARM64 (đảm bảo -arch arm64 đứng độc lập)
 CXXFLAGS = -arch arm64 -isysroot $(SDK_PATH) -miphoneos-version-min=12.0 -fPIC -x objective-c++ \
            -Idobby/include \
            -Idobby/source \
            -Idobby/source/Backend \
            -Idobby/source/Backend/Arm64
 
-# Danh sách các tệp mã nguồn C++ cốt lõi của Dobby cần thiết để cung cấp hàm DobbyHook
+# Danh sách các tệp mã nguồn C++ cốt lõi của Dobby
 DOBBY_SRCS = dobby/source/InterceptRouting/InterceptRouting.cc \
              dobby/source/InterceptRouting/AssemblyRouting/arm64/routing-arm64.cc \
              dobby/source/MemoryAllocator/CodeBuffer/MemoryCodeBuffer.cc \
@@ -27,10 +28,9 @@ clone_dobby:
 		git clone --depth=1 https://github.com/jmpews/Dobby.git dobby; \
 	fi
 
-# Biên dịch gộp toàn bộ tệp patch và các tệp nguồn Dobby thành tệp .dylib hoàn chỉnh trong 1 bước duy nhất
 LibSheepctMod.dylib: patch_force_success.mm clone_dobby
 	@echo "Compiling and linking LibSheepctMod.dylib for arm64..."
-	$(CXX)$(CXXFLAGS) patch_force_success.mm $(DOBBY_SRCS)$(LDFLAGS) -o LibSheepctMod.dylib
+	$(CXX) $(CXXFLAGS) patch_force_success.mm $(DOBBY_SRCS) $(LDFLAGS) -o LibSheepctMod.dylib
 	@if [ -f LibSheepctMod.dylib ]; then \
 		echo "SUCCESS: LibSheepctMod.dylib built successfully!"; \
 	else \
@@ -39,4 +39,5 @@ LibSheepctMod.dylib: patch_force_success.mm clone_dobby
 	fi
 
 clean:
-	rm -f LibSheepctMod.
+	rm -f LibSheepctMod.dylib
+	rm -rf dobby
