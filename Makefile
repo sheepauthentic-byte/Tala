@@ -2,6 +2,8 @@ CXX = xcrun --sdk iphoneos clang++
 SDK_PATH = $(shell xcrun --sdk iphoneos --show-sdk-path)
 
 CXXFLAGS = -arch arm64 -isysroot $(SDK_PATH) -miphoneos-version-min=12.0 -fPIC -x objective-c++ -Idobby/include
+
+# Tách riêng thư viện .a và cờ liên kết đặt ở PHÍA SAU tệp nguồn
 LDFLAGS = -shared -lobjc -framework Foundation dobby/build/libdobby.a
 
 all: setup_dobby LibSheepctMod.dylib
@@ -21,6 +23,7 @@ setup_dobby:
 		make -j$$(sysctl -n hw.ncpu); \
 	fi
 
+# Đảm bảo tệp nguồn patch_force_success.mm đứng TRƯỚC, thư viện LDFLAGS (chứa libdobby.a) đứng SAU
 LibSheepctMod.dylib: patch_force_success.mm
 	$(CXX) $(CXXFLAGS) patch_force_success.mm $(LDFLAGS) -o LibSheepctMod.dylib
 
