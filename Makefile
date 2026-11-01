@@ -1,36 +1,42 @@
-# Khai báo trình biên dịch riêng, cờ kiến trúc đưa vào CXXFLAGS
 CXX = xcrun --sdk iphoneos clang++
 SDK_PATH = $(shell xcrun --sdk iphoneos --show-sdk-path)
 
-# Cờ biên dịch tối ưu cho iOS ARM64 (đảm bảo -arch arm64 đứng độc lập)
-CXXFLAGS = -arch arm64 -isysroot $(SDK_PATH) -miphoneos-version-min=12.0 -fPIC -x objective-c++ \
-           -Idobby/include \
-           -Idobby/source \
-           -Idobby/source/Backend \
-           -Idobby/source/Backend/Arm64
+CXXFLAGS = -arch arm64 -isysroot $(SDK_PATH) -miphoneos-version-min=12.0 -fPIC -x objective-c++ -Idobby/include
 
-# Danh sách các tệp mã nguồn C++ cốt lõi của Dobby
-DOBBY_SRCS = dobby/source/InterceptRouting/InterceptRouting.cc \
-             dobby/source/InterceptRouting/AssemblyRouting/arm64/routing-arm64.cc \
-             dobby/source/MemoryAllocator/CodeBuffer/MemoryCodeBuffer.cc \
-             dobby/source/MemoryAllocator/AssemblyCodePatch.cc \
-             dobby/source/CoreServices/MemoryAllocator.cc \
-             dobby/source/CoreServices/MachMemory.cc \
-             dobby/builtin/SymbolResolver/macho/SymbolResolver.cc
+all: setup_dobby LibSheepctMod.dylib
 
-LDFLAGS = -shared -lobjc -framework Foundation
-
-all: clone_dobby LibSheepctMod.dylib
-
-clone_dobby:
+setup_dobby:
 	@if [ ! -d "dobby" ]; then \
 		echo "Cloning Dobby repository..."; \
 		git clone --depth=1 https://github.com/jmpews/Dobby.git dobby; \
 	fi
+	@if [ ! -f "dobby/build/libdobby.a" ] && [ ! -f "dobby/build/lib/libdobby.a" ]; then \
+		echo "Configuring and building Dobby via CMake..."; \
+		mkdir -p dobby/build && \
+		cd dobby/build && \
+		cmake .. \
+			-DCMAKE_SYSTEM_NAME=Darwin \
+			-DCMAKE_SYSTEM_PROCESSOR=arm64 \
+			-DCMAKE_OSX_SYSROOT=$(SDK_PATH) \
+			-DCMAKE_OSX_ARCHITECTURES=arm64 \
+			-DCMAKE_C_COMPILER=clang \
+			-DCMAKE_CXX_COMPILER=clang++ && \
+		make -j$$(sysctl -n hw.ncpu); \
+	fi
 
-LibSheepctMod.dylib: patch_force_success.mm clone_dobby
-	@echo "Compiling and linking LibSheepctMod.dylib for arm64..."
-	$(CXX) $(CXXFLAGS) patch_force_success.mm $(DOBBY_SRCS) $(LDFLAGS) -o LibSheepctMod.dylib
+# Tự động quét tìm libdobby.a dù nó nằm ở bất kỳ thư mục con nào trong build/
+DOBBY_LIB = $(shell find dobby/build -name "libdobby.a" | head -n 1)
+
+patch_force_success.o: patch_force_success.mm
+	$(CXX) $(CXXFLAGS) -c patch_force_success.mm -o patch_force_success.o
+
+LibSheepctMod.dylib: patch_force_success.o setup_dobby
+	@echo "Linking with Dobby library at: $(DOBBY_LIB)"
+	$(CXX) -arch arm64 -isysroot $(SDK_PATH) -dynamiclib \
+		patch_force_success.o \
+		$(DOBBY_LIB) \
+		-lobjc -framework Foundation \
+		-o LibSheepctMod.dylib
 	@if [ -f LibSheepctMod.dylib ]; then \
 		echo "SUCCESS: LibSheepctMod.dylib built successfully!"; \
 	else \
@@ -39,5 +45,5 @@ LibSheepctMod.dylib: patch_force_success.mm clone_dobby
 	fi
 
 clean:
-	rm -f LibSheepctMod.dylib
+	rm -f LibSheepctMod.dylib patch_force_success.o
 	rm -rf dobby
