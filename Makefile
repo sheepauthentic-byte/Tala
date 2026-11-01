@@ -3,9 +3,6 @@ SDK_PATH = $(shell xcrun --sdk iphoneos --show-sdk-path)
 
 CXXFLAGS = -arch arm64 -isysroot $(SDK_PATH) -miphoneos-version-min=12.0 -fPIC -x objective-c++ -Idobby/include
 
-# Tách riêng thư viện .a và cờ liên kết đặt ở PHÍA SAU tệp nguồn
-LDFLAGS = -shared -lobjc -framework Foundation dobby/build/libdobby.a
-
 all: setup_dobby LibSheepctMod.dylib
 
 setup_dobby:
@@ -23,10 +20,18 @@ setup_dobby:
 		make -j$$(sysctl -n hw.ncpu); \
 	fi
 
-# Đảm bảo tệp nguồn patch_force_success.mm đứng TRƯỚC, thư viện LDFLAGS (chứa libdobby.a) đứng SAU
-LibSheepctMod.dylib: patch_force_success.mm
-	$(CXX) $(CXXFLAGS) patch_force_success.mm $(LDFLAGS) -o LibSheepctMod.dylib
+# Bước 1: Chỉ biên dịch tệp .mm thành tệp đối tượng .o (Không dính dáng gì đến libdobby.a ở đây)
+patch_force_success.o: patch_force_success.mm
+	$(CXX) $(CXXFLAGS) -c patch_force_success.mm -o patch_force_success.o
+
+# Bước 2: Liên kết tệp đối tượng .o với thư viện tĩnh libdobby.a để tạo ra dylib chuẩn
+LibSheepctMod.dylib: patch_force_success.o
+	$(CXX) -arch arm64 -isysroot $(SDK_PATH) -dynamiclib \
+		patch_force_success.o \
+		dobby/build/libdobby.a \
+		-lobjc -framework Foundation \
+		-o LibSheepctMod.dylib
 
 clean:
-	rm -f LibSheepctMod.dylib
+	rm -f LibSheepctMod.dylib patch_force_success.o
 	rm -rf dobby/build
